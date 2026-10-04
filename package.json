@@ -1,0 +1,32 @@
+{
+  "name": "opina",
+  "version": "0.0.1",
+  "private": true,
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "dev": "pnpm --filter @opina/server dev",
+    "demo": "pnpm --filter @opina/demo dev",
+    "build": "pnpm --filter @opina/widget build && pnpm --filter @opina/server build",
+    "build:widget": "pnpm --filter @opina/widget build",
+    "build:server": "pnpm --filter @opina/server build",
+    "db:generate": "pnpm --filter @opina/server db:generate",
+    "lint": "pnpm -r --if-present lint",
+    "typecheck": "pnpm -r --if-present typecheck",
+    "test": "pnpm -r --if-present test"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "better-sqlite3",
+      "esbuild",
+      "unrs-resolver",
+      "vue-demi"
+    ]
+  },
+  "volta": {
+    "node": "22.22.2"
+  },
+  "engines": {
+    "node": "22.x",
+    "pnpm": ">=10"
+  }
+}

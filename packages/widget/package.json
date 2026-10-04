@@ -1,0 +1,46 @@
+{
+  "name": "@opina/widget",
+  "version": "0.0.1",
+  "description": "Embeddable Opina CSAT / feedback widget (IIFE)",
+  "type": "module",
+  "author": "Enzo Notario <hi@enzonotario.me>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/enzonotario/opina.git",
+    "directory": "packages/widget"
+  },
+  "homepage": "https://github.com/enzonotario/opina#readme",
+  "bugs": {
+    "url": "https://github.com/enzonotario/opina/issues"
+  },
+  "files": [
+    "dist"
+  ],
+  "main": "./dist/widget.js",
+  "unpkg": "./dist/widget.js",
+  "jsdelivr": "./dist/widget.js",
+  "exports": {
+    ".": "./dist/widget.js",
+    "./widget.js": "./dist/widget.js",
+    "./capture.js": "./dist/capture.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "vite build && vite build -c vite.capture.config.ts && node ./scripts/sync-public.mjs",
+    "dev": "vite build --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
+  },
+  "dependencies": {
+    "html2canvas": "^1.4.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2",
+    "vite": "^7.1.5"
+  },
+  "volta": {
+    "node": "22.22.2"
+  }
+}

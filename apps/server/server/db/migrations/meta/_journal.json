@@ -1,0 +1,34 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790976006671,
+      "tag": "0000_misty_malice",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790981200000,
+      "tag": "0001_survey_editor",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1791036000000,
+      "tag": "0002_screenshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1791050000000,
+      "tag": "0003_visitor_index",
+      "breakpoints": true
+    }
+  ]
+}

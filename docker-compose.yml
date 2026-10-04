@@ -1,0 +1,23 @@
+services:
+  opina:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    # Match host user so ./data stays writable for local `make dev` (HMR)
+    user: "${DOCKER_UID:-1000}:${DOCKER_GID:-1000}"
+    ports:
+      - "${OPINA_PORT:-3000}:3000"
+    volumes:
+      - ./data:/data
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      NUXT_PUBLIC_URL: ${NUXT_PUBLIC_URL:-http://localhost:3000}
+      NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD:-change-me-to-a-random-32-char-secret!!}
+      # Local compose only — production compose must set a strong password.
+      OPINA_ALLOW_INSECURE: ${OPINA_ALLOW_INSECURE:-1}
+      # Always absolute inside the container (ignore host-relative OPINA_DATA_DIR from .env)
+      OPINA_DATA_DIR: /data
+      OPINA_MIGRATIONS_DIR: /app/migrations

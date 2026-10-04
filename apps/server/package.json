@@ -1,0 +1,43 @@
+{
+  "name": "@opina/server",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "nuxt build",
+    "dev": "nuxt dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
+    "lint": "eslint .",
+    "typecheck": "nuxt typecheck",
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.901.0",
+    "@iconify-json/lucide": "^1.2.137",
+    "@nuxt/ui": "^4.11.2",
+
+    "@vueuse/core": "^15.0.0",
+    "@vueuse/nuxt": "^15.0.0",
+    "better-sqlite3": "^11.10.0",
+    "drizzle-orm": "^0.44.5",
+    "nanoid": "^5.1.5",
+    "nuxt": "^4.5.2",
+    "nuxt-auth-utils": "^0.5.25",
+    "tailwindcss": "^4.3.3",
+    "valibot": "^1.1.0"
+  },
+  "devDependencies": {
+    "@nuxt/eslint": "^1.17.0",
+    "@types/better-sqlite3": "^7.6.13",
+    "drizzle-kit": "^0.31.4",
+    "eslint": "^10.11.0",
+    "eslint-plugin-better-tailwindcss": "^4.7.0",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4",
+    "vue-tsc": "^3.3.11"
+  },
+  "volta": {
+    "node": "22.22.2"
+  }
+}

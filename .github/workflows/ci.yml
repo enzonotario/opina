@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @opina/widget build
+      - name: Widget size < 8KB gzip
+        run: |
+          bytes=$(gzip -c packages/widget/dist/widget.js | wc -c)
+          echo "widget gzip: ${bytes} bytes"
+          test "$bytes" -lt 8192
+          test ! -f packages/widget/dist/widget.js.map
+          test -f apps/server/public/widget.js
+      - run: pnpm --filter @opina/widget typecheck
+      - run: pnpm --filter @opina/server test
+      - run: pnpm --filter @opina/server lint
+      - run: pnpm --filter @opina/server build
+      - name: Widget Playwright smoke
+        run: |
+          pnpm --filter @opina/demo exec playwright install --with-deps chromium
+          pnpm --filter @opina/demo test:e2e

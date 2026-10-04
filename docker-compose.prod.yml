@@ -1,0 +1,26 @@
+# Production-oriented compose (no host UID override, no weak password default).
+# Usage:
+#   cp .env.example .env   # set NUXT_PUBLIC_URL + NUXT_SESSION_PASSWORD (32+ chars)
+#   docker compose -f docker-compose.prod.yml -p opina up -d --build
+
+services:
+  opina:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: opina:latest
+    restart: unless-stopped
+    ports:
+      - "${OPINA_PORT:-3000}:3000"
+    volumes:
+      - ./data:/data
+    env_file:
+      - path: .env
+        required: true
+    environment:
+      NUXT_PUBLIC_URL: ${NUXT_PUBLIC_URL}
+      NUXT_SESSION_PASSWORD: ${NUXT_SESSION_PASSWORD}
+      OPINA_DATA_DIR: /data
+      OPINA_MIGRATIONS_DIR: /app/migrations
+      OPINA_TRUST_PROXY: ${OPINA_TRUST_PROXY:-true}
+      NODE_ENV: production

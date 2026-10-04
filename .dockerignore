@@ -1,0 +1,16 @@
+.git
+.idea
+.ai
+.atl
+data
+**/.nuxt
+**/.output
+**/node_modules
+**/dist
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+apps/server/public/widget.js
+apps/server/public/widget.js.map
