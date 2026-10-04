@@ -11,7 +11,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3'
-import { getSqlite } from '../db/client'
+import { backupDatabase } from '../db/client'
 import { getSetting, setSetting } from './settings'
 
 const execFileAsync = promisify(execFile)
@@ -210,7 +210,7 @@ export async function runBackup(): Promise<BackupStatus> {
   const cleanup = [snapPath, gzPath, shotsPath]
 
   try {
-    await getSqlite().backup(snapPath)
+    await backupDatabase(snapPath)
     await pipeline(createReadStream(snapPath), createGzip(), createWriteStream(gzPath))
     const client = s3(cfg)
     const bytes = await uploadFile(client, cfg, key, gzPath, 'application/gzip')

@@ -4,14 +4,11 @@ FROM oven/bun:1 AS base
 WORKDIR /app
 
 FROM base AS deps
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends python3 make g++ \
-  && rm -rf /var/lib/apt/lists/*
-COPY package.json bun.lock pnpm-workspace.yaml ./
+COPY package.json bun.lock bunfig.toml ./
 COPY apps/demo/package.json apps/demo/
 COPY apps/server/package.json apps/server/
 COPY packages/widget/package.json packages/widget/
-RUN bun install --frozen-lockfile \
+RUN bun install --frozen-lockfile --linker=hoisted \
   --filter './apps/server' \
   --filter './packages/widget' \
   --filter './'

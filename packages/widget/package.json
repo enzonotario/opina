@@ -31,7 +31,7 @@
     "build": "vite build && vite build -c vite.capture.config.ts && node ./scripts/sync-public.mjs",
     "dev": "vite build --watch",
     "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "bun run build"
   },
   "dependencies": {
     "html2canvas": "^1.4.1"

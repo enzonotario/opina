@@ -1,11 +1,12 @@
-import Database from 'better-sqlite3'
-import { mkdirSync } from 'node:fs'
+import { Database } from 'bun:sqlite'
+import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { drizzle } from 'drizzle-orm/better-sqlite3'
+import { drizzle } from 'drizzle-orm/bun-sqlite'
+import { migrate } from 'drizzle-orm/bun-sqlite/migrator'
 import * as schema from './schema'
 
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
-let _sqlite: Database.Database | null = null
+let _sqlite: Database | null = null
 
 function resolveDataDir() {
   try {
@@ -24,11 +25,11 @@ export function getSqlite() {
   mkdirSync(join(dataDir, 'tmp'), { recursive: true })
 
   const dbPath = join(dataDir, 'opina.db')
-  _sqlite = new Database(dbPath)
-  _sqlite.pragma('journal_mode = WAL')
-  _sqlite.pragma('synchronous = NORMAL')
-  _sqlite.pragma('foreign_keys = ON')
-  _sqlite.pragma('busy_timeout = 5000')
+  _sqlite = new Database(dbPath, { create: true })
+  _sqlite.exec('PRAGMA journal_mode = WAL')
+  _sqlite.exec('PRAGMA synchronous = NORMAL')
+  _sqlite.exec('PRAGMA foreign_keys = ON')
+  _sqlite.exec('PRAGMA busy_timeout = 5000')
 
   return _sqlite
 }
@@ -37,6 +38,16 @@ export function useDb() {
   if (_db) return _db
   _db = drizzle(getSqlite(), { schema })
   return _db
+}
+
+export function runMigrations(migrationsFolder: string) {
+  migrate(useDb(), { migrationsFolder })
+}
+
+export async function backupDatabase(destPath: string) {
+  const sqlite = getSqlite()
+  sqlite.exec('PRAGMA wal_checkpoint(TRUNCATE)')
+  writeFileSync(destPath, sqlite.serialize())
 }
 
 export { schema }

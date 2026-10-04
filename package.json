@@ -2,36 +2,27 @@
   "name": "opina",
   "version": "0.0.1",
   "private": true,
-  "packageManager": "pnpm@10.34.5",
   "workspaces": [
     "apps/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "pnpm --filter @opina/server dev",
-    "demo": "pnpm --filter @opina/demo dev",
-    "build": "pnpm --filter @opina/widget build && pnpm --filter @opina/server build",
-    "build:widget": "pnpm --filter @opina/widget build",
-    "build:server": "pnpm --filter @opina/server build",
-    "db:generate": "pnpm --filter @opina/server db:generate",
-    "lint": "pnpm -r --if-present lint",
-    "lint:fix": "pnpm -r --if-present lint:fix",
-    "typecheck": "pnpm -r --if-present typecheck",
-    "test": "pnpm -r --if-present test"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "better-sqlite3",
-      "esbuild",
-      "unrs-resolver",
-      "vue-demi"
-    ]
+    "dev": "bun run --filter @opina/server dev",
+    "demo": "bun run --filter @opina/demo dev",
+    "build": "bun run --filter @opina/widget build && bun run --filter @opina/server build",
+    "build:widget": "bun run --filter @opina/widget build",
+    "build:server": "bun run --filter @opina/server build",
+    "db:generate": "bun run --filter @opina/server db:generate",
+    "lint": "bun run --filter '*' lint",
+    "lint:fix": "bun run --filter '*' lint:fix",
+    "typecheck": "bun run --filter '*' typecheck",
+    "test": "bun run --filter '*' test"
   },
   "volta": {
-    "node": "22.22.2"
+    "node": "22.22.2",
+    "bun": "1.3.14"
   },
   "engines": {
-    "node": "22.x",
-    "pnpm": ">=10"
+    "bun": ">=1.2"
   }
 }

@@ -1,7 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
-import { useDb } from '../db/client'
+import { runMigrations } from '../db/client'
 
 function resolveMigrationsFolder() {
   if (process.env.OPINA_MIGRATIONS_DIR) {
@@ -22,8 +21,7 @@ function resolveMigrationsFolder() {
 }
 
 export default defineNitroPlugin(() => {
-  const db = useDb()
   const migrationsFolder = resolveMigrationsFolder()
-  migrate(db, { migrationsFolder })
+  runMigrations(migrationsFolder)
   console.info(`[opina] database migrations applied from ${migrationsFolder}`)
 })

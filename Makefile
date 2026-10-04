@@ -93,14 +93,14 @@ dev: sync-env fix-data-perms widget ## Nuxt HMR on the host (stops Docker first)
 	@echo "Hot reload (Nuxt) → http://localhost:$(PORT)/"
 	@echo "Stop with Ctrl+C. Use make up for the production Docker image."
 	@echo ""
-	pnpm --filter @opina/server exec nuxt dev --host 127.0.0.1 --port $(PORT)
+	bun run --filter @opina/server dev -- --host 127.0.0.1 --port $(PORT)
 
 widget: ## Build packages/widget → apps/server/public/widget.js
-	pnpm --filter @opina/widget build
+	bun run --filter @opina/widget build
 
 demo: ## Vue demo site on :3001 (needs make dev on :3000)
 	@echo "Demo → http://127.0.0.1:3001/  (Opina API must be on :3000)"
-	pnpm --filter @opina/demo dev
+	bun run --filter @opina/demo dev
 
 up: env ## Build + start production Docker stack (no HMR)
 	$(COMPOSE) up -d --build --wait

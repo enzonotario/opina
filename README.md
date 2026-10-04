@@ -5,19 +5,18 @@ Self-hosted CSAT and feedback surveys. One container, SQLite, multi-project admi
 ## Stack
 
 - Nuxt 4 + Nuxt UI + nuxt-auth-utils
-- SQLite (better-sqlite3) + Drizzle ORM
+- Bun + `bun:sqlite` + Drizzle ORM
 - Vanilla TypeScript widget (Vite IIFE)
-- pnpm workspaces (local) / Bun (production Docker image)
+- Bun workspaces
 
 ## Requirements
 
-- Node.js **22.x** (Volta pin included; required for `better-sqlite3`)
-- pnpm 10+
+- Bun **1.2+** (Volta pin included)
 
 ## Quick start
 
 ```bash
-pnpm install
+bun install
 make env
 make dev          # Nuxt with hot reload on :3000
 ```
@@ -53,12 +52,12 @@ Data lives in `./data` (`opina.db`). `make env` creates `.env` from `.env.exampl
 
 | Command | Purpose |
 | --- | --- |
-| `pnpm dev` / `make dev` | Nuxt admin + API (HMR) |
+| `bun run dev` / `make dev` | Nuxt admin + API (HMR) |
 | `make demo` | Vue demo site on `:3001` |
 | `make widget` | Build widget into `packages/widget/dist/` (+ sync to `apps/server/public/`) |
-| `pnpm build` | Build widget, then server |
-| `pnpm test` | Run tests |
-| `pnpm db:generate` | Generate Drizzle migrations from schema |
+| `bun run build` | Build widget, then server |
+| `bun run test` | Run tests |
+| `bun run db:generate` | Generate Drizzle migrations from schema |
 
 ## Widget demo
 
