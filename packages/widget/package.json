@@ -1,6 +1,6 @@
 {
   "name": "@opina/widget",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Embeddable Opina CSAT / feedback widget (IIFE)",
   "type": "module",
   "author": "Enzo Notario <hi@enzonotario.me>",
