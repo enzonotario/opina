@@ -3,6 +3,10 @@
   "version": "0.0.1",
   "private": true,
   "packageManager": "pnpm@10.34.5",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "scripts": {
     "dev": "pnpm --filter @opina/server dev",
     "demo": "pnpm --filter @opina/demo dev",

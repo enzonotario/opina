@@ -695,8 +695,11 @@ function boot() {
   if (!script) return
   state.key = script.getAttribute('data-key') || ''
   if (!state.key) return
+  const dataBase = script.getAttribute('data-base')?.trim()
   try {
-    state.baseUrl = new URL(script.src, location.href).origin
+    state.baseUrl = dataBase
+      ? new URL(dataBase, location.href).origin
+      : new URL(script.src, location.href).origin
   }
   catch {
     state.baseUrl = location.origin

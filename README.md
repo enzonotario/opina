@@ -7,7 +7,7 @@ Self-hosted CSAT and feedback surveys. One container, SQLite, multi-project admi
 - Nuxt 4 + Nuxt UI + nuxt-auth-utils
 - SQLite (better-sqlite3) + Drizzle ORM
 - Vanilla TypeScript widget (Vite IIFE)
-- pnpm workspaces
+- pnpm workspaces (local) / Bun (production Docker image)
 
 ## Requirements
 

@@ -9,7 +9,7 @@ mkdir -p "$DATA_DIR" "$DATA_DIR/tmp" 2>/dev/null || true
 if [ "$(id -u)" = "0" ] && id opina >/dev/null 2>&1; then
   chown -R opina:opina "$DATA_DIR" 2>/dev/null || true
   exec setpriv --reuid="$(id -u opina)" --regid="$(id -g opina)" --clear-groups -- \
-    node .output/server/index.mjs
+    bun .output/server/index.mjs
 fi
 
-exec node .output/server/index.mjs
+exec bun .output/server/index.mjs
