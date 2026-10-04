@@ -20,8 +20,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          registry-url: https://registry.npmjs.org
           cache: pnpm
+          # Do not set registry-url: it injects a dummy NODE_AUTH_TOKEN
+          # that breaks npm trusted publishing (OIDC).
 
       - name: Ensure npm CLI supports trusted publishing
         run: npm install -g npm@latest
@@ -48,4 +49,5 @@ jobs:
         working-directory: packages/widget
         run: npm publish --access public
         env:
-          NPM_CONFIG_PROVENANCE: true
+          # Ensure no leftover token overrides OIDC trusted publishing.
+          NODE_AUTH_TOKEN: ''
