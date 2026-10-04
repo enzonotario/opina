@@ -12,6 +12,9 @@ COMPOSE      := docker compose -f $(COMPOSE_FILE) -p $(PROJECT)
 SERVICE      ?= opina
 PORT         ?= $(shell grep -E '^OPINA_PORT=' .env 2>/dev/null | cut -d= -f2- | tr -d '"' | tr -d "'")
 PORT         := $(if $(PORT),$(PORT),3000)
+# Absolute Node binary (Volta pin). Avoid `bun run … node` which can resolve a
+# different Node ABI and break better-sqlite3 native bindings.
+NODE_BIN     ?= $(shell volta which node 2>/dev/null || command -v node)
 
 export DOCKER_UID := $(shell id -u)
 export DOCKER_GID := $(shell id -g)
@@ -93,7 +96,7 @@ dev: sync-env fix-data-perms widget ## Nuxt HMR on the host (stops Docker first)
 	@echo "Hot reload (Nuxt) → http://localhost:$(PORT)/"
 	@echo "Stop with Ctrl+C. Use make up for the production Docker image."
 	@echo ""
-	bun run --filter @opina/server dev -- --host 127.0.0.1 --port $(PORT)
+	cd apps/server && $(NODE_BIN) ./node_modules/nuxt/bin/nuxt.mjs dev --host 127.0.0.1 --port $(PORT)
 
 widget: ## Build packages/widget → apps/server/public/widget.js
 	bun run --filter @opina/widget build

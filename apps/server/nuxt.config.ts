@@ -1,5 +1,19 @@
 import { fileURLToPath } from 'node:url'
 
+// Nuxt's dev worker still runs on Node and cannot load `bun:` builtins.
+// Production/Docker sets NITRO_PRESET=bun (or NODE_ENV=production) → bun:sqlite.
+const nitroPreset = process.env.NITRO_PRESET
+  || (process.env.NODE_ENV === 'production' ? 'bun' : undefined)
+const useBunSqlite
+  = nitroPreset === 'bun' || process.env.OPINA_SQLITE === 'bun'
+
+const dbDriver = fileURLToPath(
+  new URL(
+    useBunSqlite ? './server/db/driver.bun.ts' : './server/db/driver.node.ts',
+    import.meta.url,
+  ),
+)
+
 export default defineNuxtConfig({
   modules: [
     '@nuxt/eslint',
@@ -37,6 +51,7 @@ export default defineNuxtConfig({
 
   alias: {
     '#shared': fileURLToPath(new URL('./shared', import.meta.url)),
+    '#opina-db-driver': dbDriver,
   },
 
   routeRules: {
@@ -50,7 +65,10 @@ export default defineNuxtConfig({
   compatibilityDate: '2026-06-30',
 
   nitro: {
-    preset: 'bun',
+    preset: nitroPreset,
+    alias: {
+      '#opina-db-driver': dbDriver,
+    },
     experimental: {
       tasks: true,
     },

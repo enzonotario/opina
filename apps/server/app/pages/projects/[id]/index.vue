@@ -39,9 +39,11 @@ if (error.value) {
 
 const project = computed(() => data.value!.project)
 
-const { data: statsData, status: statsStatus } = await useFetch<{ stats: StatsPayload }>(
+const { data: statsData, status: statsStatus, refresh: refreshStats } = await useFetch<{ stats: StatsPayload }>(
   () => `/api/admin/projects/${id.value}/stats?days=30`,
 )
+
+const { autoRefresh } = useAutoRefresh(() => refreshStats())
 
 const stats = computed(() => statsData.value?.stats)
 
@@ -69,6 +71,11 @@ function reaction(score: number | null) {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <USwitch
+            v-model="autoRefresh"
+            label="Auto-refresh"
+            size="sm"
+          />
           <UButton
             :to="`/projects/${project.id}/responses`"
             size="sm"

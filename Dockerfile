@@ -15,6 +15,8 @@ RUN bun install --frozen-lockfile --linker=hoisted \
 
 FROM deps AS build
 COPY . .
+ENV NITRO_PRESET=bun
+ENV NODE_ENV=production
 RUN bun run --filter @opina/widget build \
   && bun run --filter @opina/server build
 

@@ -5,13 +5,14 @@ Self-hosted CSAT and feedback surveys. One container, SQLite, multi-project admi
 ## Stack
 
 - Nuxt 4 + Nuxt UI + nuxt-auth-utils
-- Bun + `bun:sqlite` + Drizzle ORM
+- SQLite via Drizzle (`better-sqlite3` in local Nuxt/Node workers; `bun:sqlite` in production Docker)
 - Vanilla TypeScript widget (Vite IIFE)
-- Bun workspaces
+- Bun workspaces (package manager + production runtime)
 
 ## Requirements
 
 - Bun **1.2+** (Volta pin included)
+- Node.js **22.x** (Nuxt dev workers; also used to compile `better-sqlite3`)
 
 ## Quick start
 
