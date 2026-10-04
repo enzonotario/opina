@@ -28,6 +28,8 @@ const path = ref('')
 const surveyFilter = ref<string>('all')
 const page = ref(0)
 const pageSize = 50
+const autoRefresh = useLocalStorage('opina:responses:auto-refresh', true)
+const POLL_MS = 10_000
 
 const query = computed(() => {
   const params = new URLSearchParams()
@@ -41,13 +43,23 @@ const query = computed(() => {
   return params.toString()
 })
 
-const { data, status } = await useFetch(
+const { data, status, refresh } = await useFetch(
   () => `/api/admin/projects/${id.value}/responses?${query.value}`,
 )
 
 watch([q, hasComment, path, surveyFilter], () => {
   page.value = 0
 })
+
+const visibility = useDocumentVisibility()
+const { pause, resume } = useIntervalFn(() => {
+  refresh()
+}, POLL_MS, { immediate: false })
+
+watch([autoRefresh, visibility], ([enabled, vis]) => {
+  if (enabled && vis === 'visible') resume()
+  else pause()
+}, { immediate: true })
 
 const totalPages = computed(() =>
   Math.max(1, Math.ceil((data.value?.total || 0) / pageSize)),
@@ -179,6 +191,13 @@ const surveyItems = computed(() => [
               ]"
             />
           </div>
+        </template>
+        <template #right>
+          <USwitch
+            v-model="autoRefresh"
+            label="Auto-refresh"
+            size="sm"
+          />
         </template>
       </UDashboardToolbar>
     </template>
