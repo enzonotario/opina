@@ -13,9 +13,9 @@ export default defineNuxtConfig({
   ui: {
     theme: {
       defaultVariants: {
-        color: 'neutral'
-      }
-    }
+        color: 'neutral',
+      },
+    },
   },
 
   runtimeConfig: {

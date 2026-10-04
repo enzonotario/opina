@@ -15,6 +15,7 @@
     "build:server": "pnpm --filter @opina/server build",
     "db:generate": "pnpm --filter @opina/server db:generate",
     "lint": "pnpm -r --if-present lint",
+    "lint:fix": "pnpm -r --if-present lint:fix",
     "typecheck": "pnpm -r --if-present typecheck",
     "test": "pnpm -r --if-present test"
   },
