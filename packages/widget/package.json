@@ -6,7 +6,7 @@
   "author": "Enzo Notario <hi@enzonotario.me>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/enzonotario/opina.git",
+    "url": "https://github.com/enzonotario/opina.git",
     "directory": "packages/widget"
   },
   "homepage": "https://github.com/enzonotario/opina#readme",

@@ -54,8 +54,14 @@ jobs:
 
       - run: pnpm --filter @opina/widget build
 
+      - name: Debug OIDC environment
+        run: |
+          echo "node=$(node -v) npm=$(npm -v)"
+          echo "ACTIONS_ID_TOKEN_REQUEST_URL=${ACTIONS_ID_TOKEN_REQUEST_URL:+set}"
+          echo "ACTIONS_ID_TOKEN_REQUEST_TOKEN=${ACTIONS_ID_TOKEN_REQUEST_TOKEN:+set}"
+
       - name: Publish @opina/widget
         working-directory: packages/widget
         run: |
           unset NODE_AUTH_TOKEN
-          npm publish --access public
+          npm publish --access public --loglevel verbose
