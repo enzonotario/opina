@@ -2,6 +2,7 @@ import { and, desc, eq, gte, isNotNull, lte, sql } from 'drizzle-orm'
 import { responses } from '../db/schema'
 import { useDb } from '../db/client'
 import { getProjectOrThrow } from './projects'
+import { deleteScreenshot } from './screenshots'
 
 export type ResponseFilters = {
   surveyId?: string
@@ -103,6 +104,23 @@ export function listResponses(projectId: string, filters: ResponseFilters = {}) 
       createdAt: row.createdAt,
     })),
   }
+}
+
+export function deleteResponse(projectId: string, responseId: string) {
+  getProjectOrThrow(projectId)
+  const row = useDb()
+    .select()
+    .from(responses)
+    .where(and(eq(responses.id, responseId), eq(responses.projectId, projectId)))
+    .get()
+
+  if (!row) {
+    throw createError({ statusCode: 404, statusMessage: 'Response not found' })
+  }
+
+  deleteScreenshot(row.screenshotPath)
+  useDb().delete(responses).where(eq(responses.id, responseId)).run()
+  return { ok: true as const }
 }
 
 export function exportResponses(projectId: string, format: 'csv' | 'json', filters: ResponseFilters = {}) {

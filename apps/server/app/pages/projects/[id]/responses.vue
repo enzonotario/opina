@@ -99,6 +99,32 @@ function copyExport(format: 'csv' | 'json') {
   toast.add({ title: `Downloading ${format.toUpperCase()}`, color: 'success' })
 }
 
+const deletingId = ref<string | null>(null)
+
+async function removeResponse(row: { id: string; comment: string | null }) {
+  const preview = row.comment?.trim()
+    ? `“${row.comment.trim().slice(0, 48)}${row.comment.trim().length > 48 ? '…' : ''}”`
+    : 'this response'
+  if (!confirm(`Delete ${preview}? This cannot be undone.`)) return
+
+  deletingId.value = row.id
+  try {
+    await $fetch(`/api/admin/projects/${id.value}/responses/${row.id}`, {
+      method: 'DELETE',
+    })
+    if (selected.value?.id === row.id) selected.value = null
+    toast.add({ title: 'Response deleted', color: 'success' })
+    await refresh()
+  } catch (err: any) {
+    toast.add({
+      title: err.data?.statusMessage || err.statusMessage || 'Delete failed',
+      color: 'error',
+    })
+  } finally {
+    deletingId.value = null
+  }
+}
+
 function fmt(ts: number) {
   return new Date(ts).toLocaleString(undefined, {
     day: '2-digit',
@@ -310,13 +336,24 @@ const surveyItems = computed(() => [
                   />
                 </td>
                 <td class="px-3 py-2 text-right">
-                  <UButton
-                    size="xs"
-                    color="neutral"
-                    variant="soft"
-                    label="View response"
-                    @click="selected = row"
-                  />
+                  <div class="inline-flex items-center gap-1">
+                    <UButton
+                      size="xs"
+                      color="neutral"
+                      variant="soft"
+                      label="View"
+                      @click="selected = row"
+                    />
+                    <UButton
+                      size="xs"
+                      color="error"
+                      variant="ghost"
+                      icon="i-lucide-trash-2"
+                      :loading="deletingId === row.id"
+                      :disabled="!!deletingId"
+                      @click="removeResponse(row)"
+                    />
+                  </div>
                 </td>
               </tr>
             </tbody>
@@ -413,6 +450,18 @@ const surveyItems = computed(() => [
               </div>
             </dl>
           </div>
+        </template>
+        <template #footer>
+          <UButton
+            v-if="selected"
+            color="error"
+            variant="soft"
+            icon="i-lucide-trash-2"
+            label="Delete response"
+            :loading="deletingId === selected.id"
+            :disabled="!!deletingId"
+            @click="removeResponse(selected)"
+          />
         </template>
       </USlideover>
     </template>
