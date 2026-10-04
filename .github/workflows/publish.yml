@@ -17,15 +17,24 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
+      # Node 24+ required for reliable npm trusted publishing (OIDC).
+      # Do not set registry-url: setup-node writes an empty _authToken that disables OIDC.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: pnpm
-          # Do not set registry-url: it injects a dummy NODE_AUTH_TOKEN
-          # that breaks npm trusted publishing (OIDC).
 
       - name: Ensure npm CLI supports trusted publishing
         run: npm install -g npm@latest
+
+      - name: Clear classic npm auth so OIDC can run
+        run: |
+          unset NODE_AUTH_TOKEN
+          for f in "${NPM_CONFIG_USERCONFIG:-}" "$HOME/.npmrc" .npmrc; do
+            [ -n "$f" ] && [ -f "$f" ] || continue
+            sed -i '/_authToken/d' "$f" || true
+            sed -i '/always-auth/d' "$f" || true
+          done
 
       - run: pnpm install --frozen-lockfile
 
@@ -47,7 +56,6 @@ jobs:
 
       - name: Publish @opina/widget
         working-directory: packages/widget
-        run: npm publish --access public
-        env:
-          # Ensure no leftover token overrides OIDC trusted publishing.
-          NODE_AUTH_TOKEN: ''
+        run: |
+          unset NODE_AUTH_TOKEN
+          npm publish --access public
