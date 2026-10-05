@@ -320,7 +320,7 @@ function loadScript(src: string) {
 
 async function captureScreenshot(): Promise<string | null> {
   try {
-    await loadScript(`${state.baseUrl}/capture.js?v=ms1`)
+    await loadScript(`${state.baseUrl}/capture.js?v=ms2`)
     const fn = window.__opinaCapture
     if (!fn) return null
     return await fn()
@@ -359,7 +359,8 @@ async function capturePageWithoutWidget() {
 async function submit(survey: Survey, score: number, comment: string, hp: string) {
   if (Date.now() - state.shownAt < 800) return
   const wantShot = survey.appearance?.includeScreenshot === true
-  const image = wantShot ? await capturePageWithoutWidget() : null
+  // Capture in parallel with the response POST so the UI is not blocked.
+  const shotPromise = wantShot ? capturePageWithoutWidget() : Promise.resolve(null)
 
   const body = {
     key: state.key,
@@ -387,8 +388,11 @@ async function submit(survey: Survey, score: number, comment: string, hp: string
   emit('submit', { surveyId: survey.id, score, comment })
   showThanks(survey)
 
-  if (wantShot && image && payload.id) {
-    quietAsync(() => uploadScreenshot(survey, payload.id!, image!))
+  if (wantShot && payload.id) {
+    quietAsync(async () => {
+      const image = await shotPromise
+      if (image) await uploadScreenshot(survey, payload.id!, image)
+    })
   }
 }
 

@@ -55,9 +55,19 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
+    // Short edge+browser TTL so embed script deploys propagate past Cloudflare.
     '/widget.js': {
       headers: {
-        'Cache-Control': 'public, max-age=3600',
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+        'CDN-Cache-Control': 'public, max-age=60',
+        'Cloudflare-CDN-Cache-Control': 'max-age=60',
+      },
+    },
+    '/capture.js': {
+      headers: {
+        'Cache-Control': 'public, max-age=60, stale-while-revalidate=300',
+        'CDN-Cache-Control': 'public, max-age=60',
+        'Cloudflare-CDN-Cache-Control': 'max-age=60',
       },
     },
   },
