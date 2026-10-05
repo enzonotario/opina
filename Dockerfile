@@ -8,7 +8,9 @@ COPY package.json bun.lock bunfig.toml ./
 COPY apps/demo/package.json apps/demo/
 COPY apps/server/package.json apps/server/
 COPY packages/widget/package.json packages/widget/
-RUN bun install --frozen-lockfile --linker=hoisted \
+# Skip lifecycle scripts: better-sqlite3 native build is only needed for local
+# Nuxt/Node workers; production uses bun:sqlite. nuxt prepare runs in build.
+RUN bun install --frozen-lockfile --linker=hoisted --ignore-scripts \
   --filter './apps/server' \
   --filter './packages/widget' \
   --filter './'
@@ -17,7 +19,8 @@ FROM deps AS build
 COPY . .
 ENV NITRO_PRESET=bun
 ENV NODE_ENV=production
-RUN bun run --filter @opina/widget build \
+RUN bun run --filter @opina/server postinstall \
+  && bun run --filter @opina/widget build \
   && bun run --filter @opina/server build
 
 FROM oven/bun:1-slim AS runtime

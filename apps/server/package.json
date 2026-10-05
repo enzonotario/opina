@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "build": "nuxt build",
-    "dev": "node ./node_modules/nuxt/bin/nuxt.mjs dev",
-    "preview": "node ./node_modules/nuxt/bin/nuxt.mjs preview",
-    "postinstall": "node ./node_modules/nuxt/bin/nuxt.mjs prepare",
+    "dev": "nuxt dev",
+    "preview": "nuxt preview",
+    "postinstall": "nuxt prepare",
     "lint": "eslint .",
     "typecheck": "nuxt typecheck",
     "test": "vitest run",
