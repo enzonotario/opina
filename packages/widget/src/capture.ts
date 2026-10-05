@@ -1,20 +1,18 @@
-import html2canvas from 'html2canvas'
+import { domToCanvas } from 'modern-screenshot'
 
 export type OpinaCaptureFn = () => Promise<string | null>
 
 async function capture(): Promise<string | null> {
   const width = Math.max(document.documentElement.clientWidth, window.innerWidth || 0)
   const scale = Math.min(1, 1200 / Math.max(width, 1))
-  const canvas = await html2canvas(document.documentElement, {
-    logging: false,
-    useCORS: true,
-    allowTaint: true,
+  const canvas = await domToCanvas(document.documentElement, {
     scale,
-    ignoreElements: (el) => {
-      const id = (el as HTMLElement).id
-      return id === 'opina-root'
+    filter: (node) => {
+      if (node.nodeType !== 1) return true
+      return (node as HTMLElement).id !== 'opina-root'
     },
   })
+
   const MAX_DATA_URL = 550_000
   const HARD_MAX = 650_000
   let quality = 0.55
