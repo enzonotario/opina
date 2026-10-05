@@ -8,9 +8,15 @@ useDashboard()
 const { projectId, inProject } = useProjectsNav()
 
 const orgLinks = computed(() => [[{
+  label: 'Dashboard',
+  icon: 'i-lucide-layout-dashboard',
+  to: '/',
+  exact: true,
+  onSelect: () => { open.value = false },
+}, {
   label: 'Projects',
   icon: 'i-lucide-folder-kanban',
-  to: '/',
+  to: '/projects',
   exact: true,
   onSelect: () => { open.value = false },
 }, {
@@ -60,7 +66,7 @@ const groups = computed(() => [{
   items: [
     ...links.value.flat(),
     ...(inProject.value
-      ? [{ label: 'All projects', icon: 'i-lucide-arrow-left', to: '/' }]
+      ? [{ label: 'Home', icon: 'i-lucide-arrow-left', to: '/' }]
       : []),
   ],
 }])
@@ -142,7 +148,7 @@ const groups = computed(() => [{
           variant="ghost"
           size="sm"
           icon="i-lucide-arrow-left"
-          :label="collapsed ? undefined : 'All projects'"
+          :label="collapsed ? undefined : 'Home'"
           :square="collapsed"
           class="mt-4"
           block

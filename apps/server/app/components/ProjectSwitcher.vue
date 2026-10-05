@@ -111,7 +111,7 @@ const initial = computed(() => (label.value || 'O').slice(0, 1).toUpperCase())
           <button
             type="button"
             class="flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium hover:bg-elevated"
-            @click="go('/')"
+            @click="go('/projects')"
           >
             <UIcon
               name="i-lucide-layout-grid"
@@ -122,7 +122,7 @@ const initial = computed(() => (label.value || 'O').slice(0, 1).toUpperCase())
           <button
             type="button"
             class="flex items-center justify-center gap-1.5 rounded-md px-2 py-2 text-xs font-medium hover:bg-elevated"
-            @click="go('/?new=1')"
+            @click="go('/projects?new=1')"
           >
             <UIcon
               name="i-lucide-plus"

@@ -1,197 +1,309 @@
 <script setup lang="ts">
-import type { ProjectDto } from '../../shared/projects'
-
-type ProjectRow = ProjectDto & {
-  stats30d: { total: number, csatPercent: number | null }
+type AccountStats = {
+  csatPercent: number | null
+  previousCsatPercent: number | null
+  average: number | null
+  total: number
+  previousTotal: number
+  withComment: number
+  projectCount: number
+  distribution: Array<{ score: number, count: number }>
+  daily: Array<{ day: string, count: number, csatPercent: number | null }>
+  projects: Array<{
+    id: string
+    name: string
+    total: number
+    csatPercent: number | null
+  }>
+  worstPages: Array<{
+    path: string
+    count: number
+    csatPercent: number | null
+    projectId: string
+    projectName: string
+  }>
+  recentComments: Array<{
+    id: string
+    score: number | null
+    comment: string
+    urlPath: string
+    createdAt: number
+    projectId: string
+    projectName: string
+  }>
 }
 
-const toast = useToast()
+const EMOJIS = ['😠', '🙁', '😐', '🙂', '😍']
 
-const { data, refresh, status } = await useFetch<{ projects: ProjectRow[] }>(
-  '/api/admin/projects',
+const { data: statsData, status: statsStatus, refresh: refreshStats } = await useFetch<{ stats: AccountStats }>(
+  '/api/admin/stats?days=30',
 )
 
-const route = useRoute()
-const createOpen = ref(route.query.new === '1')
+const { autoRefresh } = useAutoRefresh(() => refreshStats())
 
-watch(() => route.query.new, (v) => {
-  if (v === '1') createOpen.value = true
-})
-const name = ref('')
-const originsText = ref('')
-const pending = ref(false)
-const error = ref('')
+const stats = computed(() => statsData.value?.stats)
 
-function parseOrigins(value: string) {
-  return value
-    .split(/[\n,]+/)
-    .map(s => s.trim())
-    .filter(Boolean)
+function delta(current: number | null | undefined, previous: number | null | undefined) {
+  if (current == null || previous == null) return null
+  return Math.round((current - previous) * 10) / 10
 }
 
-async function createProject() {
-  error.value = ''
-  pending.value = true
-  try {
-    const { project } = await $fetch<{ project: ProjectDto }>('/api/admin/projects', {
-      method: 'POST',
-      body: {
-        name: name.value,
-        allowedOrigins: parseOrigins(originsText.value),
-      },
-    })
-    createOpen.value = false
-    name.value = ''
-    originsText.value = ''
-    await refresh()
-    toast.add({ title: 'Project created', color: 'success' })
-    await navigateTo(`/projects/${project.id}`)
-  } catch (e: unknown) {
-    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
-    error.value = err.data?.statusMessage || err.statusMessage || 'Could not create project'
-  } finally {
-    pending.value = false
-  }
+const csatDelta = computed(() => delta(stats.value?.csatPercent, stats.value?.previousCsatPercent))
+
+function reaction(score: number | null) {
+  if (score == null || score < 1 || score > 5) return '—'
+  return EMOJIS[score - 1]
+}
+
+function relativeTime(ms: number) {
+  const diff = Date.now() - ms
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
 }
 </script>
 
 <template>
   <UDashboardPanel
-    id="projects"
+    id="home-dashboard"
     :ui="{ body: 'lg:py-10' }"
   >
     <template #header>
-      <UDashboardNavbar title="Projects">
+      <UDashboardNavbar title="Dashboard">
         <template #leading>
           <UDashboardSidebarCollapse />
         </template>
-
         <template #right>
-          <UModal
-            v-model:open="createOpen"
-            title="New project"
-            description="Give it a name and add the websites where surveys can appear."
-          >
-            <UButton
-              label="New project"
-              icon="i-lucide-plus"
-            />
-            <template #body>
-              <form
-                class="space-y-4"
-                @submit.prevent="createProject"
-              >
-                <UFormField
-                  label="Name"
-                  name="name"
-                  required
-                >
-                  <UInput
-                    v-model="name"
-                    class="w-full"
-                    placeholder="My site"
-                    required
-                  />
-                </UFormField>
-                <UFormField
-                  label="Websites"
-                  name="origins"
-                  hint="One per line"
-                >
-                  <UTextarea
-                    v-model="originsText"
-                    class="w-full"
-                    :rows="3"
-                    placeholder="https://example.com"
-                  />
-                </UFormField>
-                <UAlert
-                  v-if="error"
-                  color="error"
-                  variant="subtle"
-                  :title="error"
-                />
-                <div class="flex justify-end gap-2">
-                  <UButton
-                    color="neutral"
-                    variant="ghost"
-                    label="Cancel"
-                    @click="createOpen = false"
-                  />
-                  <UButton
-                    type="submit"
-                    :loading="pending"
-                    label="Create"
-                  />
-                </div>
-              </form>
-            </template>
-          </UModal>
+          <USwitch
+            v-model="autoRefresh"
+            label="Auto-refresh"
+            size="sm"
+          />
+          <UButton
+            to="/projects?new=1"
+            size="sm"
+            label="New project"
+            icon="i-lucide-plus"
+          />
         </template>
       </UDashboardNavbar>
     </template>
 
     <template #body>
-      <div class="w-full max-w-3xl mx-auto">
-        <div
-          v-if="status === 'pending'"
-          class="text-muted text-sm"
-        >
-          Loading projects…
+      <div
+        v-if="statsStatus === 'pending' && !stats"
+        class="text-sm text-muted max-w-5xl mx-auto"
+      >
+        Loading metrics…
+      </div>
+
+      <div
+        v-else-if="stats"
+        class="space-y-6 w-full max-w-5xl mx-auto"
+      >
+        <div class="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl bg-elevated/60 ring-1 ring-default p-4">
+            <p class="text-xs font-medium text-muted">
+              CSAT
+            </p>
+            <p class="text-3xl font-semibold tracking-tight text-highlighted mt-1 tabular-nums">
+              {{ stats.csatPercent == null ? '—' : `${stats.csatPercent}%` }}
+            </p>
+            <p
+              v-if="csatDelta != null"
+              class="text-xs mt-1.5 font-medium"
+              :class="csatDelta >= 0 ? 'text-success' : 'text-error'"
+            >
+              {{ csatDelta >= 0 ? '+' : '' }}{{ csatDelta }} vs previous period
+            </p>
+            <p
+              v-else
+              class="text-xs mt-1.5 text-muted"
+            >
+              All projects · 30 days
+            </p>
+          </div>
+          <div class="rounded-xl bg-elevated/60 ring-1 ring-default p-4">
+            <p class="text-xs font-medium text-muted">
+              Average
+            </p>
+            <p class="text-3xl font-semibold tracking-tight text-highlighted mt-1 tabular-nums">
+              {{ stats.average == null ? '—' : stats.average }}
+            </p>
+            <p class="text-xs mt-1.5 text-muted">
+              Out of 5
+            </p>
+          </div>
+          <div class="rounded-xl bg-elevated/60 ring-1 ring-default p-4">
+            <p class="text-xs font-medium text-muted">
+              Responses
+            </p>
+            <p class="text-3xl font-semibold tracking-tight text-highlighted mt-1 tabular-nums">
+              {{ stats.total }}
+            </p>
+            <p class="text-xs mt-1.5 text-muted">
+              {{ stats.previousTotal }} previous period
+            </p>
+          </div>
+          <div class="rounded-xl bg-elevated/60 ring-1 ring-default p-4">
+            <p class="text-xs font-medium text-muted">
+              With comment
+            </p>
+            <p class="text-3xl font-semibold tracking-tight text-highlighted mt-1 tabular-nums">
+              {{ stats.withComment }}
+            </p>
+            <p class="text-xs mt-1.5 text-muted">
+              {{ stats.total ? Math.round((stats.withComment / stats.total) * 100) : 0 }}% of responses
+            </p>
+          </div>
         </div>
 
-        <div
-          v-else-if="!data?.projects?.length"
-          class="rounded-lg border border-dashed border-default p-8 text-center space-y-3"
+        <section
+          v-if="stats.projects.length"
+          class="rounded-xl ring-1 ring-default bg-default p-5 space-y-3"
         >
-          <p class="text-highlighted font-medium">
-            No projects yet
-          </p>
-          <p class="text-muted text-sm">
-            Create a project to get a public key and install the widget.
-          </p>
-          <UButton
-            label="Create first project"
-            @click="createOpen = true"
-          />
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm font-semibold text-highlighted">
+              By project
+            </h2>
+            <UButton
+              to="/projects"
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              label="Manage"
+            />
+          </div>
+          <ul class="grid gap-2 sm:grid-cols-2">
+            <li
+              v-for="project in stats.projects"
+              :key="project.id"
+            >
+              <NuxtLink
+                :to="`/projects/${project.id}`"
+                class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 ring-1 ring-default hover:bg-elevated/50 transition-colors"
+              >
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-highlighted truncate">
+                    {{ project.name }}
+                  </p>
+                  <p class="text-xs text-muted">
+                    {{ project.total }} responses · 30d
+                  </p>
+                </div>
+                <p class="text-sm font-semibold tabular-nums shrink-0">
+                  {{ project.csatPercent == null ? '—' : `${project.csatPercent}%` }}
+                </p>
+              </NuxtLink>
+            </li>
+          </ul>
+        </section>
+
+        <div class="grid gap-4 lg:grid-cols-5">
+          <section class="lg:col-span-3 rounded-xl ring-1 ring-default bg-default p-5 space-y-4">
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold text-highlighted">
+                Responses per day
+              </h2>
+              <span class="text-xs text-muted">All projects · 30 days</span>
+            </div>
+            <DailyChart :daily="stats.daily" />
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              <span
+                v-for="bucket in stats.distribution"
+                :key="bucket.score"
+                class="inline-flex items-center gap-1 text-xs rounded-full bg-elevated px-2.5 py-1"
+              >
+                <span>{{ EMOJIS[bucket.score - 1] }}</span>
+                <span class="tabular-nums text-muted">{{ bucket.count }}</span>
+              </span>
+            </div>
+          </section>
+
+          <section class="lg:col-span-2 rounded-xl ring-1 ring-default bg-default p-5 space-y-3">
+            <div class="flex items-center justify-between">
+              <h2 class="text-sm font-semibold text-highlighted">
+                Live comments
+              </h2>
+              <span class="text-xs text-muted">Mixed feed</span>
+            </div>
+            <ul
+              v-if="stats.recentComments.length"
+              class="divide-y divide-default -mx-1"
+            >
+              <li
+                v-for="item in stats.recentComments.slice(0, 8)"
+                :key="item.id"
+                class="px-1 py-3 first:pt-0"
+              >
+                <div class="flex items-start justify-between gap-2 mb-1">
+                  <div class="min-w-0">
+                    <NuxtLink
+                      :to="`/projects/${item.projectId}/responses`"
+                      class="text-xs font-medium text-highlighted hover:underline truncate block"
+                    >
+                      {{ item.projectName }}
+                    </NuxtLink>
+                    <span class="text-[11px] font-mono text-muted truncate block">{{ item.urlPath }}</span>
+                  </div>
+                  <div class="shrink-0 text-right">
+                    <span class="text-sm">{{ reaction(item.score) }}</span>
+                    <p class="text-[11px] text-muted">
+                      {{ relativeTime(item.createdAt) }}
+                    </p>
+                  </div>
+                </div>
+                <p class="text-sm text-highlighted line-clamp-2">
+                  {{ item.comment }}
+                </p>
+              </li>
+            </ul>
+            <p
+              v-else
+              class="text-sm text-muted py-6 text-center"
+            >
+              No comments yet across projects.
+            </p>
+          </section>
         </div>
 
-        <ul
-          v-else
-          class="divide-y divide-default border border-default rounded-lg bg-default"
-        >
-          <li
-            v-for="project in data.projects"
-            :key="project.id"
+        <section class="rounded-xl ring-1 ring-default bg-default p-5 space-y-3">
+          <h2 class="text-sm font-semibold text-highlighted">
+            Lowest-scoring pages
+          </h2>
+          <ul
+            v-if="stats.worstPages.length"
+            class="divide-y divide-default"
           >
-            <NuxtLink
-              :to="`/projects/${project.id}`"
-              class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-elevated/50 transition-colors"
+            <li
+              v-for="page in stats.worstPages"
+              :key="`${page.projectId}:${page.path}`"
+              class="py-2.5 flex items-center justify-between gap-3 first:pt-0"
             >
               <div class="min-w-0">
-                <p class="font-medium text-highlighted truncate">
-                  {{ project.name }}
+                <p class="text-xs text-muted truncate">
+                  {{ page.projectName }}
                 </p>
-                <p class="text-xs text-muted font-mono truncate">
-                  {{ project.publicKey }}
-                </p>
-              </div>
-              <div class="text-right shrink-0">
-                <p class="text-sm font-medium text-highlighted">
-                  {{ project.stats30d.csatPercent == null ? '—' : `${project.stats30d.csatPercent}%` }}
-                  <span class="text-xs text-muted font-normal">CSAT</span>
-                </p>
-                <p class="text-xs text-muted">
-                  {{ project.stats30d.total }} responses · 30d
+                <p class="text-sm truncate">
+                  {{ page.path }}
                 </p>
               </div>
-              <UIcon
-                name="i-lucide-chevron-right"
-                class="size-4 text-muted shrink-0"
-              />
-            </NuxtLink>
-          </li>
-        </ul>
+              <span class="text-sm shrink-0 tabular-nums text-muted">
+                {{ page.csatPercent }}% · {{ page.count }} responses
+              </span>
+            </li>
+          </ul>
+          <p
+            v-else
+            class="text-sm text-muted"
+          >
+            Needs at least 3 responses per page.
+          </p>
+        </section>
       </div>
     </template>
   </UDashboardPanel>
