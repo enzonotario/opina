@@ -320,7 +320,7 @@ function loadScript(src: string) {
 
 async function captureScreenshot(): Promise<string | null> {
   try {
-    await loadScript(`${state.baseUrl}/capture.js`)
+    await loadScript(`${state.baseUrl}/capture.js?v=ms1`)
     const fn = window.__opinaCapture
     if (!fn) return null
     return await fn()
