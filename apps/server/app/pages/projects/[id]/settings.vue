@@ -34,6 +34,9 @@ const snippet = computed(() => {
     `  data-key="${key}"`,
     '  defer',
     '></' + 'script>',
+    '',
+    '<!-- Optional: page feedback slot (survey type “Page feedback”) -->',
+    '<!-- <div data-opina-slot="srv_xxx"></div> -->',
   ].join('\n')
 })
 

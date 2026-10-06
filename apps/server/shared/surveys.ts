@@ -1,11 +1,16 @@
 import * as v from 'valibot'
 
-export const SurveyTypeSchema = v.picklist(['csat', 'thumbs', 'nps', 'ces', 'text'])
+export const SurveyTypeSchema = v.picklist(['csat', 'thumbs', 'helpful', 'nps', 'ces', 'text'])
 
 export const I18nTextSchema = v.pipe(
   v.record(v.string(), v.pipe(v.string(), v.maxLength(500))),
   v.check(obj => Object.keys(obj).length > 0, 'At least one locale is required'),
 )
+
+export const HelpfulOptionSchema = v.object({
+  value: v.pipe(v.number(), v.minValue(1), v.maxValue(4)),
+  label: I18nTextSchema,
+})
 
 export const TriggerSchema = v.variant('type', [
   v.object({ type: v.literal('manual') }),
@@ -52,6 +57,8 @@ export const AppearanceSchema = v.object({
   scaleStyle: v.optional(v.picklist(['emojis', 'numbers', 'stars']), 'emojis'),
   lowLabel: v.optional(I18nTextSchema, { es: 'Muy insatisfecho', en: 'Very dissatisfied' }),
   highLabel: v.optional(I18nTextSchema, { es: 'Muy satisfecho', en: 'Very satisfied' }),
+  options: v.optional(v.pipe(v.array(HelpfulOptionSchema), v.minLength(4), v.maxLength(4))),
+  imageUrl: v.optional(v.pipe(v.string(), v.maxLength(2048)), ''),
   locale: v.optional(v.pipe(v.string(), v.maxLength(16)), 'es'),
   includeScreenshot: v.optional(v.boolean(), false),
 })
@@ -90,6 +97,13 @@ export type SurveyFrequency = v.InferOutput<typeof FrequencySchema>
 export type SurveyTrigger = v.InferOutput<typeof TriggerSchema>
 export type SurveyTargeting = v.InferOutput<typeof TargetingSchema>
 
+export const DEFAULT_HELPFUL_OPTIONS: Array<{ value: number, label: Record<string, string> }> = [
+  { value: 4, label: { es: 'Muy útil', en: 'Very helpful' } },
+  { value: 3, label: { es: 'Útil', en: 'Helpful' } },
+  { value: 2, label: { es: 'No útil', en: 'Not helpful' } },
+  { value: 1, label: { es: 'Confuso', en: 'Confusing' } },
+]
+
 export const DEFAULT_APPEARANCE: SurveyAppearance = {
   background: '#ffffff',
   button: '#16a34a',
@@ -98,6 +112,8 @@ export const DEFAULT_APPEARANCE: SurveyAppearance = {
   scaleStyle: 'emojis',
   lowLabel: { es: 'Muy insatisfecho', en: 'Very dissatisfied' },
   highLabel: { es: 'Muy satisfecho', en: 'Very satisfied' },
+  options: DEFAULT_HELPFUL_OPTIONS,
+  imageUrl: '',
   locale: 'es',
   includeScreenshot: false,
 }

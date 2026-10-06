@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { ProjectDto } from '../../../../shared/projects'
-import type { SurveyDto } from '../../../../shared/surveys'
+import type { ProjectDto } from '#shared/projects'
+import type { SurveyDto } from '#shared/surveys'
+import { DEFAULT_HELPFUL_OPTIONS } from '#shared/surveys'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -22,16 +23,59 @@ const { data, refresh, status } = await useFetch<{ surveys: SurveyDto[] }>(
 
 const creating = ref(false)
 
-async function createSurvey() {
+const createItems = [
+  [
+    {
+      label: 'Rating scale (CSAT)',
+      description: 'Floating panel with 1–5 score',
+      icon: 'i-lucide-smile',
+      onSelect: () => createSurvey('csat'),
+    },
+    {
+      label: 'Page feedback',
+      description: 'Inline “Was this helpful?” with 4 options',
+      icon: 'i-lucide-message-square-heart',
+      onSelect: () => createSurvey('helpful'),
+    },
+  ],
+]
+
+async function createSurvey(type: 'csat' | 'helpful') {
   creating.value = true
   try {
-    const { survey } = await $fetch<{ survey: SurveyDto }>(
-      `/api/admin/projects/${id.value}/surveys`,
-      {
-        method: 'POST',
-        body: {
+    const body = type === 'helpful'
+      ? {
+          name: 'Page feedback',
+          type: 'helpful' as const,
+          question: {
+            es: '¿Te resultó útil?',
+            en: 'Was this helpful?',
+          },
+          followUp: {
+            es: 'Cuéntanos más (opcional)',
+            en: 'Tell us more (optional)',
+          },
+          thanks: {
+            es: '¡Gracias por tus comentarios!',
+            en: 'Thanks for your feedback!',
+          },
+          appearance: {
+            button: '#16a34a',
+            background: '#ffffff',
+            text: '#18181b',
+            locale: 'es',
+            options: DEFAULT_HELPFUL_OPTIONS,
+          },
+          trigger: { type: 'manual' as const },
+          frequency: { mode: 'once' as const },
+          targeting: {
+            devices: ['desktop', 'tablet', 'mobile'] as Array<'desktop' | 'tablet' | 'mobile'>,
+            sampleRate: 100,
+          },
+        }
+      : {
           name: 'CSAT',
-          type: 'csat',
+          type: 'csat' as const,
           question: {
             es: '¿Cómo calificarías tu satisfacción?',
             en: 'How would you rate your satisfaction?',
@@ -45,8 +89,8 @@ async function createSurvey() {
             en: 'Thanks for your feedback!',
           },
           appearance: {
-            scaleStyle: 'emojis',
-            position: 'right',
+            scaleStyle: 'emojis' as const,
+            position: 'right' as const,
             button: '#16a34a',
             background: '#ffffff',
             text: '#18181b',
@@ -54,14 +98,17 @@ async function createSurvey() {
             lowLabel: { es: 'Muy insatisfecho', en: 'Very dissatisfied' },
             highLabel: { es: 'Muy satisfecho', en: 'Very satisfied' },
           },
-          trigger: { type: 'manual' },
-          frequency: { mode: 'once' },
+          trigger: { type: 'manual' as const },
+          frequency: { mode: 'once' as const },
           targeting: {
-            devices: ['desktop', 'tablet', 'mobile'],
+            devices: ['desktop', 'tablet', 'mobile'] as Array<'desktop' | 'tablet' | 'mobile'>,
             sampleRate: 100,
           },
-        },
-      },
+        }
+
+    const { survey } = await $fetch<{ survey: SurveyDto }>(
+      `/api/admin/projects/${id.value}/surveys`,
+      { method: 'POST', body },
     )
     toast.add({ title: 'Survey created', color: 'success' })
     await navigateTo(`/projects/${id.value}/surveys/${survey.id}`)
@@ -84,6 +131,7 @@ async function removeSurvey(survey: SurveyDto) {
 }
 
 function triggerLabel(survey: SurveyDto) {
+  if (survey.type === 'helpful') return 'Inline slot'
   const t = survey.trigger
   if (t.type === 'delay') return `After ${Math.round(t.ms / 1000)}s`
   if (t.type === 'scroll') return `On scroll (${t.percent}%)`
@@ -97,14 +145,16 @@ function triggerLabel(survey: SurveyDto) {
 function frequencyLabel(survey: SurveyDto) {
   const f = survey.frequency
   if (f.mode === 'until_submit') return 'Until response'
-  if (f.mode === 'once') return 'Once'
+  if (f.mode === 'once') return survey.type === 'helpful' ? 'Once per page' : 'Once'
   if (f.mode === 'always') return 'Always'
   if (f.mode === 'cooldown') return `Every ${f.days}d`
   return f.mode
 }
 
 function typeLabel(survey: SurveyDto) {
-  return survey.type === 'thumbs' ? 'Thumbs' : 'Rating'
+  if (survey.type === 'thumbs') return 'Thumbs'
+  if (survey.type === 'helpful') return 'Page feedback'
+  return 'Rating'
 }
 </script>
 
@@ -119,12 +169,14 @@ function typeLabel(survey: SurveyDto) {
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <UButton
-            label="New survey"
-            icon="i-lucide-plus"
-            :loading="creating"
-            @click="createSurvey"
-          />
+          <UDropdownMenu :items="createItems">
+            <UButton
+              label="New survey"
+              icon="i-lucide-plus"
+              :loading="creating"
+              trailing-icon="i-lucide-chevron-down"
+            />
+          </UDropdownMenu>
         </template>
       </UDashboardNavbar>
     </template>
@@ -188,11 +240,13 @@ function typeLabel(survey: SurveyDto) {
           <p class="text-highlighted font-medium">
             No surveys
           </p>
-          <UButton
-            label="Create survey"
-            :loading="creating"
-            @click="createSurvey"
-          />
+          <UDropdownMenu :items="createItems">
+            <UButton
+              label="Create survey"
+              :loading="creating"
+              trailing-icon="i-lucide-chevron-down"
+            />
+          </UDropdownMenu>
         </div>
       </div>
     </template>

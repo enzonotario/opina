@@ -16,6 +16,7 @@ export type ProjectStats = {
   previousCsatPercent: number | null
   average: number | null
   distribution: Array<{ score: number, count: number }>
+  helpfulDistribution: Array<{ score: number, count: number }>
   thumbsPositivePercent: number | null
   daily: Array<{ day: string, count: number, avg: number | null, csatPercent: number | null }>
   worstPages: Array<{ path: string, count: number, csatPercent: number | null, average: number | null }>
@@ -67,10 +68,17 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
   const previousCsat = previous.filter(r => r.surveyType === 'csat' && r.score != null).map(r => r.score!)
   const thumbs = current.filter(r => r.surveyType === 'thumbs' && r.score != null)
   const thumbsPositive = thumbs.filter(r => r.score === 1).length
+  const helpfulScores = current.filter(r => r.surveyType === 'helpful' && r.score != null).map(r => r.score!)
 
   const distMap = new Map<number, number>()
   for (let i = 1; i <= 5; i++) distMap.set(i, 0)
   for (const s of currentCsat) distMap.set(s, (distMap.get(s) || 0) + 1)
+
+  const helpfulDistMap = new Map<number, number>()
+  for (let i = 1; i <= 4; i++) helpfulDistMap.set(i, 0)
+  for (const s of helpfulScores) {
+    if (s >= 1 && s <= 4) helpfulDistMap.set(s, (helpfulDistMap.get(s) || 0) + 1)
+  }
 
   const byDay = new Map<string, number[]>()
   for (let i = 0; i < days; i++) {
@@ -143,6 +151,9 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
     previousCsatPercent: csatPercent(previousCsat),
     average: averageScore(currentCsat),
     distribution: [...distMap.entries()].map(([score, count]) => ({ score, count })),
+    helpfulDistribution: [...helpfulDistMap.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([score, count]) => ({ score, count })),
     thumbsPositivePercent: thumbs.length
       ? Math.round((thumbsPositive / thumbs.length) * 1000) / 10
       : null,
@@ -253,10 +264,17 @@ export function getAccountStats(days = 30): AccountStats {
   const previousCsat = previous.filter(r => r.surveyType === 'csat' && r.score != null).map(r => r.score!)
   const thumbs = current.filter(r => r.surveyType === 'thumbs' && r.score != null)
   const thumbsPositive = thumbs.filter(r => r.score === 1).length
+  const helpfulScores = current.filter(r => r.surveyType === 'helpful' && r.score != null).map(r => r.score!)
 
   const distMap = new Map<number, number>()
   for (let i = 1; i <= 5; i++) distMap.set(i, 0)
   for (const s of currentCsat) distMap.set(s, (distMap.get(s) || 0) + 1)
+
+  const helpfulDistMap = new Map<number, number>()
+  for (let i = 1; i <= 4; i++) helpfulDistMap.set(i, 0)
+  for (const s of helpfulScores) {
+    if (s >= 1 && s <= 4) helpfulDistMap.set(s, (helpfulDistMap.get(s) || 0) + 1)
+  }
 
   const byDay = new Map<string, number[]>()
   for (let i = 0; i < days; i++) {
@@ -361,6 +379,9 @@ export function getAccountStats(days = 30): AccountStats {
     previousCsatPercent: csatPercent(previousCsat),
     average: averageScore(currentCsat),
     distribution: [...distMap.entries()].map(([score, count]) => ({ score, count })),
+    helpfulDistribution: [...helpfulDistMap.entries()]
+      .sort((a, b) => b[0] - a[0])
+      .map(([score, count]) => ({ score, count })),
     thumbsPositivePercent: thumbs.length
       ? Math.round((thumbsPositive / thumbs.length) * 1000) / 10
       : null,

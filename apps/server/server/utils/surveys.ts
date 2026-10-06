@@ -7,7 +7,10 @@ import type {
   SurveyTargeting,
   SurveyUpdate,
 } from '../../shared/surveys'
-import { DEFAULT_APPEARANCE } from '../../shared/surveys'
+import {
+  DEFAULT_APPEARANCE,
+  DEFAULT_HELPFUL_OPTIONS,
+} from '../../shared/surveys'
 import { surveys } from '../db/schema'
 import { useDb } from '../db/client'
 import { createId } from './ids'
@@ -20,6 +23,32 @@ function asRecord(value: unknown): Record<string, string> {
     if (typeof v === 'string') out[k] = v
   }
   return out
+}
+
+function normalizeOptions(raw: unknown): SurveyAppearance['options'] {
+  if (!Array.isArray(raw) || raw.length !== 4) {
+    return DEFAULT_HELPFUL_OPTIONS.map(o => ({
+      value: o.value,
+      label: { ...o.label },
+    }))
+  }
+  const out: NonNullable<SurveyAppearance['options']> = []
+  for (const item of raw) {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) continue
+    const row = item as Record<string, unknown>
+    const value = typeof row.value === 'number' ? row.value : Number(row.value)
+    if (!Number.isFinite(value) || value < 1 || value > 4) continue
+    const label = asRecord(row.label)
+    if (!Object.keys(label).length) continue
+    out.push({ value, label })
+  }
+  if (out.length !== 4) {
+    return DEFAULT_HELPFUL_OPTIONS.map(o => ({
+      value: o.value,
+      label: { ...o.label },
+    }))
+  }
+  return out.sort((a, b) => b.value - a.value)
 }
 
 function normalizeAppearance(raw: Record<string, unknown>): SurveyAppearance {
@@ -35,6 +64,8 @@ function normalizeAppearance(raw: Record<string, unknown>): SurveyAppearance {
       : 'emojis',
     lowLabel: Object.keys(low).length ? low : { ...DEFAULT_APPEARANCE.lowLabel },
     highLabel: Object.keys(high).length ? high : { ...DEFAULT_APPEARANCE.highLabel },
+    options: normalizeOptions(raw.options),
+    imageUrl: typeof raw.imageUrl === 'string' ? raw.imageUrl.trim() : '',
     locale: typeof raw.locale === 'string' ? raw.locale : 'es',
     includeScreenshot: raw.includeScreenshot === true,
   }

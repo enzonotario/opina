@@ -1,12 +1,13 @@
 <script setup lang="ts">
-import type { SurveyAppearance } from '../../../shared/surveys'
+import type { SurveyAppearance } from '#shared/surveys'
+import { DEFAULT_HELPFUL_OPTIONS } from '#shared/surveys'
 
 const props = defineProps<{
   question: string
   followUp: string
   thanks: string
   appearance: SurveyAppearance
-  type: 'csat' | 'thumbs'
+  type: 'csat' | 'thumbs' | 'helpful'
   step?: 'rating' | 'comment' | 'thanks'
 }>()
 
@@ -23,9 +24,10 @@ const styleVars = computed(() => ({
   '--pv-text': props.appearance.text || '#18181b',
 }))
 
-const positionClass = computed(() =>
-  props.appearance.position === 'left' ? 'items-end justify-start' : 'items-end justify-end',
-)
+const positionClass = computed(() => {
+  if (props.type === 'helpful') return 'items-center justify-center'
+  return props.appearance.position === 'left' ? 'items-end justify-start' : 'items-end justify-end'
+})
 
 function pickLabel(map: Record<string, string> | undefined, fallback: string) {
   if (!map) return fallback
@@ -35,6 +37,20 @@ function pickLabel(map: Record<string, string> | undefined, fallback: string) {
 
 const low = computed(() => pickLabel(props.appearance.lowLabel, 'Muy insatisfecho'))
 const high = computed(() => pickLabel(props.appearance.highLabel, 'Muy satisfecho'))
+
+const helpfulPills = computed(() => {
+  const options = props.appearance.options?.length === 4
+    ? props.appearance.options
+    : DEFAULT_HELPFUL_OPTIONS
+  return [...options]
+    .sort((a, b) => b.value - a.value)
+    .map(o => ({
+      value: o.value,
+      label: pickLabel(o.label, String(o.value)),
+    }))
+})
+
+const logoUrl = computed(() => (props.appearance.imageUrl || '').trim())
 
 const nextLabel = computed(() =>
   props.appearance.locale === 'en' ? 'Next' : 'Siguiente',
@@ -63,6 +79,87 @@ const closeLabel = computed(() =>
     </div>
 
     <div
+      v-if="type === 'helpful'"
+      class="relative z-10 w-full max-w-[420px] rounded-xl border border-black/10 p-4"
+      :style="{ background: 'var(--pv-bg)', color: 'var(--pv-text)', ...styleVars }"
+    >
+      <template v-if="step === 'rating'">
+        <div class="flex items-center gap-2.5 mb-3">
+          <img
+            v-if="logoUrl"
+            :src="logoUrl"
+            alt=""
+            class="size-9 rounded-lg object-contain shrink-0"
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+          >
+          <p class="text-sm font-semibold leading-snug m-0">
+            {{ question || '…' }}
+          </p>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <button
+            v-for="pill in helpfulPills"
+            :key="pill.value"
+            type="button"
+            class="rounded-full border border-black/10 px-3.5 py-1.5 text-sm font-medium"
+            :class="selected === pill.value ? 'ring-2' : 'hover:bg-black/5'"
+            :style="selected === pill.value ? { outlineColor: 'var(--pv-btn)', borderColor: 'var(--pv-btn)' } : {}"
+            @click="selected = pill.value"
+          >
+            {{ pill.label }}
+          </button>
+        </div>
+      </template>
+
+      <template v-else-if="step === 'comment'">
+        <div class="flex items-center gap-2.5 mb-3">
+          <img
+            v-if="logoUrl"
+            :src="logoUrl"
+            alt=""
+            class="size-9 rounded-lg object-contain shrink-0"
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+          >
+          <p class="text-sm font-semibold leading-snug m-0">
+            {{ followUp || '…' }}
+          </p>
+        </div>
+        <div class="h-20 rounded-lg border border-black/10 mb-3 bg-black/5" />
+        <div class="flex justify-end">
+          <button
+            type="button"
+            class="rounded-lg px-3 py-1.5 text-sm font-semibold text-white"
+            :style="{ background: 'var(--pv-btn)' }"
+          >
+            {{ sendLabel }}
+          </button>
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="flex items-center gap-2.5">
+          <img
+            v-if="logoUrl"
+            :src="logoUrl"
+            alt=""
+            class="size-9 rounded-lg object-contain shrink-0"
+            loading="lazy"
+            decoding="async"
+            referrerpolicy="no-referrer"
+          >
+          <p class="text-sm font-semibold leading-snug m-0">
+            {{ thanks || '¡Gracias!' }}
+          </p>
+        </div>
+      </template>
+    </div>
+
+    <div
+      v-else
       class="relative z-10 w-full max-w-[320px] rounded-2xl shadow-xl border border-black/5 p-4"
       :style="{ background: 'var(--pv-bg)', color: 'var(--pv-text)', ...styleVars }"
     >

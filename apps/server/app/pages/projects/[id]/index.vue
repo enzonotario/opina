@@ -10,6 +10,7 @@ type StatsPayload = {
   withComment: number
   thumbsPositivePercent: number | null
   distribution: Array<{ score: number, count: number }>
+  helpfulDistribution: Array<{ score: number, count: number }>
   daily: Array<{ day: string, count: number, csatPercent: number | null }>
   worstPages: Array<{ path: string, count: number, csatPercent: number | null }>
   recentComments: Array<{
@@ -22,6 +23,12 @@ type StatsPayload = {
 }
 
 const EMOJIS = ['😠', '🙁', '😐', '🙂', '😍']
+const HELPFUL_LABELS: Record<number, string> = {
+  4: 'Muy útil',
+  3: 'Útil',
+  2: 'No útil',
+  1: 'Confuso',
+}
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -175,10 +182,24 @@ function reaction(score: number | null) {
             <div class="flex flex-wrap gap-1.5 pt-1">
               <span
                 v-for="bucket in stats.distribution"
-                :key="bucket.score"
+                :key="`csat-${bucket.score}`"
                 class="inline-flex items-center gap-1 text-xs rounded-full bg-elevated px-2.5 py-1"
               >
                 <span>{{ EMOJIS[bucket.score - 1] }}</span>
+                <span class="tabular-nums text-muted">{{ bucket.count }}</span>
+              </span>
+            </div>
+            <div
+              v-if="stats.helpfulDistribution?.some(b => b.count > 0)"
+              class="flex flex-wrap gap-1.5 pt-1 border-t border-default"
+            >
+              <span class="text-[11px] text-muted w-full pt-1">Page feedback</span>
+              <span
+                v-for="bucket in stats.helpfulDistribution"
+                :key="`helpful-${bucket.score}`"
+                class="inline-flex items-center gap-1 text-xs rounded-full bg-elevated px-2.5 py-1"
+              >
+                <span>{{ HELPFUL_LABELS[bucket.score] || bucket.score }}</span>
                 <span class="tabular-nums text-muted">{{ bucket.count }}</span>
               </span>
             </div>

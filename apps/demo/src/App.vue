@@ -9,6 +9,11 @@ type OpinaApi = {
   on: (event: string, handler: (...args: unknown[]) => void) => void
 }
 
+type WidgetSurvey = {
+  id: string
+  type: string
+}
+
 declare global {
   interface Window {
     Opina?: OpinaApi
@@ -18,6 +23,7 @@ declare global {
 const log = ref<string[]>([])
 const ready = ref(false)
 const surveyId = ref('')
+const helpfulSurveyId = ref('')
 
 function push(line: string) {
   const time = new Date().toLocaleTimeString()
@@ -62,9 +68,13 @@ onMounted(async () => {
       push(`config HTTP ${res.status} — allow origin ${origin} on the project`)
       return
     }
-    const data = await res.json() as { surveys: Array<{ id: string }> }
-    surveyId.value = data.surveys[0]?.id || ''
-    push(`config ok — surveys=${data.surveys.length}`)
+    const data = await res.json() as { surveys: WidgetSurvey[] }
+    const csat = data.surveys.find(s => s.type === 'csat' || s.type === 'thumbs')
+    const helpful = data.surveys.find(s => s.type === 'helpful')
+    surveyId.value = csat?.id || data.surveys[0]?.id || ''
+    helpfulSurveyId.value = helpful?.id || ''
+    push(`config ok — surveys=${data.surveys.length}`
+      + (helpfulSurveyId.value ? ` · helpful=${helpfulSurveyId.value}` : ' · no helpful survey'))
   }
   catch (e) {
     push(e instanceof Error ? e.message : 'boot failed')
@@ -73,6 +83,24 @@ onMounted(async () => {
 
 function openWidget() {
   window.Opina?.show(surveyId.value || undefined)
+}
+
+function forcePageFeedback() {
+  if (!helpfulSurveyId.value) {
+    push('no helpful survey on this project — create Page feedback in admin')
+    return
+  }
+  // Clear path-scoped frequency so the slot can remount after a prior submit.
+  const removed: string[] = []
+  for (const key of Object.keys(localStorage)) {
+    if (key.includes(`:${helpfulSurveyId.value}`)) {
+      localStorage.removeItem(key)
+      removed.push(key)
+    }
+  }
+  if (removed.length) push(`cleared helpful frequency (${removed.length})`)
+  window.Opina?.show(helpfulSurveyId.value)
+  push(`forced page feedback ${helpfulSurveyId.value}`)
 }
 
 function hideWidget() {
@@ -102,11 +130,12 @@ function clearFrequency() {
     <section class="card">
       <p class="muted">
         Project key: <code>pk_zuog15csvosgycph</code>
-        <span v-if="surveyId"> · survey: <code>{{ surveyId }}</code></span>
+        <span v-if="surveyId"> · float: <code>{{ surveyId }}</code></span>
+        <span v-if="helpfulSurveyId"> · helpful: <code>{{ helpfulSurveyId }}</code></span>
       </p>
       <div class="row">
         <button :disabled="!ready" type="button" @click="openWidget">
-          Dar feedback
+          Dar feedback (float)
         </button>
         <button
           class="secondary"
@@ -114,6 +143,13 @@ function clearFrequency() {
           type="button"
         >
           Abrir con data-opina
+        </button>
+        <button
+          :disabled="!ready || !helpfulSurveyId"
+          type="button"
+          @click="forcePageFeedback"
+        >
+          Forzar page feedback
         </button>
         <button class="secondary" type="button" @click="hideWidget">
           Hide
@@ -124,8 +160,19 @@ function clearFrequency() {
       </div>
       <p class="muted" style="margin: 12px 0 0">
         Los triggers automáticos respetan la frecuencia (localStorage).
-        <code>Opina.show()</code> y <code>data-opina</code> siempre abren.
+        <code>Opina.show()</code> y <strong>Forzar page feedback</strong> siempre abren (ignoran el tope).
       </p>
+    </section>
+
+    <section class="card">
+      <p class="muted">
+        Page feedback slot (<code>data-opina-slot</code>)
+        <span v-if="!helpfulSurveyId"> — create an active <strong>helpful</strong> survey in admin.</span>
+        <span v-else> — <code>{{ helpfulSurveyId }}</code></span>
+      </p>
+      <div
+        :data-opina-slot="helpfulSurveyId || ''"
+      />
     </section>
 
     <section class="card">

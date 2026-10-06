@@ -6,6 +6,8 @@ type Appearance = {
   scaleStyle?: 'emojis' | 'numbers' | 'stars'
   lowLabel?: Record<string, string>
   highLabel?: Record<string, string>
+  options?: Array<{ value: number, label: Record<string, string> }>
+  imageUrl?: string
   locale?: string
   includeScreenshot?: boolean
 }
@@ -55,6 +57,13 @@ type OpinaApi = {
 
 const EMOJIS = ['😠', '🙁', '😐', '🙂', '😍']
 
+const DEFAULT_HELPFUL_OPTIONS: Array<{ value: number, label: Record<string, string> }> = [
+  { value: 4, label: { es: 'Muy útil', en: 'Very helpful' } },
+  { value: 3, label: { es: 'Útil', en: 'Helpful' } },
+  { value: 2, label: { es: 'No útil', en: 'Not helpful' } },
+  { value: 1, label: { es: 'Confuso', en: 'Confusing' } },
+]
+
 const state = {
   key: '',
   baseUrl: '',
@@ -67,6 +76,7 @@ const state = {
   shownAt: 0,
   handlers: new Map<string, Array<(...args: unknown[]) => void>>(),
   armed: new Set<string>(),
+  mountedSlots: new Set<string>(),
   escHandler: null as ((ev: KeyboardEvent) => void) | null,
 }
 
@@ -101,7 +111,8 @@ function t(map: Record<string, string> | null | undefined, fallback: string) {
   return map[state.locale] || map[short] || map.es || map.en || fallback
 }
 
-function storageKey(surveyId: string) {
+function storageKey(surveyId: string, pathScoped = false) {
+  if (pathScoped) return `opina:freq:${state.key}:${surveyId}:${location.pathname}`
   return `opina:freq:${state.key}:${surveyId}`
 }
 
@@ -127,10 +138,14 @@ function freqMode(survey: Survey): FreqMode {
   return { mode: 'once' }
 }
 
+function isPathScoped(survey: Survey) {
+  return survey.type === 'helpful'
+}
+
 function isFrequencyBlocked(survey: Survey) {
   const f = freqMode(survey)
   if (f.mode === 'always') return false
-  const raw = quiet(() => localStorage.getItem(storageKey(survey.id)))
+  const raw = quiet(() => localStorage.getItem(storageKey(survey.id, isPathScoped(survey))))
   if (!raw) return false
   if (raw === '1') return true
   const until = Number(raw)
@@ -141,12 +156,13 @@ function markFrequency(survey: Survey, reason: 'submit' | 'dismiss') {
   const f = freqMode(survey)
   if (f.mode === 'always') return
   if (f.mode === 'until_submit' && reason === 'dismiss') return
+  const key = storageKey(survey.id, isPathScoped(survey))
   if (f.mode === 'cooldown') {
     const until = Date.now() + f.days * 86400000
-    quiet(() => localStorage.setItem(storageKey(survey.id), String(until)))
+    quiet(() => localStorage.setItem(key, String(until)))
     return
   }
-  quiet(() => localStorage.setItem(storageKey(survey.id), '1'))
+  quiet(() => localStorage.setItem(key, '1'))
 }
 
 function device(): 'mobile' | 'tablet' | 'desktop' {
@@ -259,9 +275,20 @@ function css() {
 .teaser .q{margin:0;flex:1;font-size:12px;font-weight:500;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .teaser .chev{border:0;background:transparent;color:inherit;opacity:.45;font-size:14px;padding:2px;cursor:pointer;line-height:1}
 .teaser .x{padding:2px;font-size:16px}
+.inline{position:relative;max-width:100%;width:100%;z-index:auto}
+.inline .card{box-shadow:none;border-radius:12px;padding:14px 16px}
+.inline .q{font-size:14px;font-weight:600;margin:0 0 10px}
+.inline-head{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+.inline-head .q{margin:0;flex:1;min-width:0}
+.logo{width:36px;height:36px;object-fit:contain;flex-shrink:0;border-radius:8px}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.pill{border:1px solid rgba(0,0,0,.12);background:transparent;color:inherit;border-radius:999px;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:500;line-height:1.2}
+.pill:hover,.pill:focus-visible{border-color:var(--opina-btn,#16a34a);outline:none}
+.pill.on{border-color:var(--opina-btn,#16a34a);background:color-mix(in srgb, var(--opina-btn,#16a34a) 12%, transparent);box-shadow:0 0 0 2px color-mix(in srgb, var(--opina-btn,#16a34a) 28%, transparent)}
+.inline .thanks{margin:4px 0;text-align:left;font-size:14px}
 @media (max-width:767px){
-  .wrap:not(.teaser){left:0!important;right:0!important;bottom:0;width:100%;max-width:none;padding:0}
-  .wrap:not(.teaser) .card{border-radius:16px 16px 0 0;max-height:min(78vh,640px);overflow:auto;box-shadow:0 -8px 32px rgba(0,0,0,.16)}
+  .wrap:not(.teaser):not(.inline){left:0!important;right:0!important;bottom:0;width:100%;max-width:none;padding:0}
+  .wrap:not(.teaser):not(.inline) .card{border-radius:16px 16px 0 0;max-height:min(78vh,640px);overflow:auto;box-shadow:0 -8px 32px rgba(0,0,0,.16)}
   .scores .btn{min-width:0;flex:1}
 }
 `
@@ -357,35 +384,12 @@ async function capturePageWithoutWidget() {
 }
 
 async function submit(survey: Survey, score: number, comment: string, hp: string) {
-  if (Date.now() - state.shownAt < 800) return
   const wantShot = survey.appearance?.includeScreenshot === true
   // Capture in parallel with the response POST so the UI is not blocked.
   const shotPromise = wantShot ? capturePageWithoutWidget() : Promise.resolve(null)
 
-  const body = {
-    key: state.key,
-    surveyId: survey.id,
-    score,
-    comment: comment || null,
-    path: location.pathname,
-    host: location.host,
-    locale: state.locale,
-    visitorId: state.visitorId,
-    metadata: state.meta,
-    device: device(),
-    shownAt: state.shownAt,
-    hp,
-  }
-  const res = await fetch(`${state.baseUrl}/api/v1/widget/responses`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'omit',
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error('submit failed')
-  const payload = await res.json() as { ok?: boolean, id?: string }
-  markFrequency(survey, 'submit')
-  emit('submit', { surveyId: survey.id, score, comment })
+  const payload = await submitResponse(survey, score, comment, hp, state.shownAt)
+  if (payload === false) return
   showThanks(survey)
 
   if (wantShot && payload.id) {
@@ -432,7 +436,198 @@ function scoreButtons(survey: Survey): Array<{ value: number, label: string }> {
   })
 }
 
-function render(survey: Survey, opts?: { startCollapsed?: boolean }) {
+function helpfulOptions(survey: Survey): Array<{ value: number, label: string }> {
+  const raw = survey.appearance?.options
+  const source = Array.isArray(raw) && raw.length === 4
+    ? raw
+    : DEFAULT_HELPFUL_OPTIONS
+  return [...source]
+    .sort((a, b) => b.value - a.value)
+    .map(o => ({
+      value: o.value,
+      label: t(o.label, String(o.value)),
+    }))
+}
+
+function helpfulLogoHtml(a: Appearance) {
+  const url = (a.imageUrl || '').trim()
+  if (!url) return ''
+  return `<img class="logo" src="${escapeHtml(url)}" alt="" width="36" height="36" loading="lazy" decoding="async" referrerpolicy="no-referrer" />`
+}
+
+function helpfulHeadHtml(title: string, a: Appearance, id = 'opina-helpful-q') {
+  const logo = helpfulLogoHtml(a)
+  const q = `<p class="q" id="${id}">${escapeHtml(title)}</p>`
+  if (!logo) return q
+  return `<div class="inline-head">${logo}${q}</div>`
+}
+
+async function submitResponse(
+  survey: Survey,
+  score: number,
+  comment: string,
+  hp: string,
+  shownAt: number,
+) {
+  if (Date.now() - shownAt < 800) return false
+  const body = {
+    key: state.key,
+    surveyId: survey.id,
+    score,
+    comment: comment || null,
+    path: location.pathname,
+    host: location.host,
+    locale: state.locale,
+    visitorId: state.visitorId,
+    metadata: state.meta,
+    device: device(),
+    shownAt,
+    hp,
+  }
+  const res = await fetch(`${state.baseUrl}/api/v1/widget/responses`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'omit',
+    body: JSON.stringify(body),
+  })
+  if (!res.ok) throw new Error('submit failed')
+  const payload = await res.json() as { ok?: boolean, id?: string }
+  markFrequency(survey, 'submit')
+  emit('submit', { surveyId: survey.id, score, comment })
+  return payload
+}
+
+function renderHelpful(slot: HTMLElement, survey: Survey, opts?: { force?: boolean }) {
+  const mountKey = `${survey.id}:${location.pathname}:${slot.getAttribute('data-opina-slot') || ''}`
+  if (state.mountedSlots.has(mountKey) && !opts?.force) return
+  if (!opts?.force) {
+    if (isFrequencyBlocked(survey) || !pathAllowed(survey) || !deviceAllowed(survey) || !sampleAllows(survey)) {
+      emit('suppressed', { surveyId: survey.id, reason: 'gates' })
+      return
+    }
+  }
+
+  state.mountedSlots.add(mountKey)
+  const shadow = slot.shadowRoot || slot.attachShadow({ mode: 'closed' })
+  const a = survey.appearance || {}
+  const question = t(survey.question, 'Was this helpful?')
+  const follow = survey.followUp
+    ? t(survey.followUp, '')
+    : t({ es: 'Cuéntanos más (opcional)', en: 'Tell us more (optional)' }, 'Tell us more (optional)')
+  const thanksMsg = t(survey.thanks, t({ es: '¡Gracias por tus comentarios!', en: 'Thanks for your feedback!' }, 'Thanks!'))
+  const shownAt = Date.now()
+  let chosen: number | null = null
+  let step: 'rating' | 'comment' | 'thanks' = 'rating'
+
+  const paint = () => {
+    if (step === 'thanks') {
+      shadow.innerHTML = `
+        <style>${css()}</style>
+        <div class="wrap inline" style="${themeVars(a)}">
+          <div class="card" role="status" aria-live="polite">
+            ${helpfulHeadHtml(thanksMsg, a, 'opina-helpful-thanks')}
+          </div>
+        </div>
+      `
+      return
+    }
+
+    if (step === 'comment') {
+      shadow.innerHTML = `
+        <style>${css()}</style>
+        <div class="wrap inline" style="${themeVars(a)}">
+          <div class="card" role="group" aria-label="Feedback">
+            ${helpfulHeadHtml(follow, a, 'opina-helpful-follow')}
+            <div class="follow">
+              <textarea class="ta" data-comment maxlength="2000"></textarea>
+              <input class="hp" tabindex="-1" autocomplete="off" data-hp aria-hidden="true" />
+              <div class="actions">
+                <button class="back" type="button" data-back>${escapeHtml(ui(survey, 'back', 'Back'))}</button>
+                <button class="send" type="button" data-send>${escapeHtml(ui(survey, 'send', 'Send'))}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `
+      shadow.querySelector('[data-back]')?.addEventListener('click', () => {
+        step = 'rating'
+        paint()
+      })
+      shadow.querySelector('[data-send]')?.addEventListener('click', () => {
+        if (chosen == null) return
+        const comment = shadow.querySelector<HTMLTextAreaElement>('[data-comment]')?.value || ''
+        const hp = shadow.querySelector<HTMLInputElement>('[data-hp]')?.value || ''
+        quietAsync(async () => {
+          const ok = await submitResponse(survey, chosen!, comment, hp, shownAt)
+          if (ok === false) return
+          step = 'thanks'
+          paint()
+        })
+      })
+      shadow.querySelector<HTMLTextAreaElement>('[data-comment]')?.focus()
+      return
+    }
+
+    shadow.innerHTML = `
+      <style>${css()}</style>
+      <div class="wrap inline" style="${themeVars(a)}">
+        <div class="card" role="group" aria-label="Page feedback">
+          ${helpfulHeadHtml(question, a)}
+          <div class="pills" data-pills role="group" aria-labelledby="opina-helpful-q"></div>
+        </div>
+      </div>
+    `
+    const pills = shadow.querySelector('[data-pills]')!
+    for (const item of helpfulOptions(survey)) {
+      const b = document.createElement('button')
+      b.type = 'button'
+      b.className = 'pill' + (chosen === item.value ? ' on' : '')
+      b.textContent = item.label
+      b.setAttribute('aria-label', item.label)
+      b.addEventListener('click', () => {
+        chosen = item.value
+        step = 'comment'
+        paint()
+      })
+      pills.appendChild(b)
+    }
+  }
+
+  paint()
+  emit('shown', { surveyId: survey.id, inline: true })
+}
+
+function mountHelpfulSlots() {
+  const surveys = (state.config?.surveys || []).filter(s => s.type === 'helpful')
+  if (!surveys.length) return
+  const slots = Array.from(document.querySelectorAll<HTMLElement>('[data-opina-slot]'))
+  for (const slot of slots) {
+    const attr = slot.getAttribute('data-opina-slot')
+    const survey = attr
+      ? surveys.find(s => s.id === attr) || null
+      : surveys[0] || null
+    if (!survey) continue
+    renderHelpful(slot, survey)
+  }
+}
+
+function watchHelpfulSlots() {
+  if (typeof MutationObserver === 'undefined') return
+  const obs = new MutationObserver(() => {
+    if (!state.config) return
+    mountHelpfulSlots()
+  })
+  obs.observe(document.documentElement, { childList: true, subtree: true })
+}
+
+function render(survey: Survey, opts?: { startCollapsed?: boolean, force?: boolean }) {
+  if (survey.type === 'helpful') {
+    const id = survey.id
+    const slot = document.querySelector<HTMLElement>(`[data-opina-slot="${id}"]`)
+      || document.querySelector<HTMLElement>('[data-opina-slot]')
+    if (slot) renderHelpful(slot, survey, { force: opts?.force })
+    return
+  }
   ensureHost()
   clearEsc()
   const shadow = state.shadow!
@@ -626,13 +821,14 @@ function show(surveyId?: string, opts?: ShowOptions) {
       return
     }
     const startCollapsed = !opts?.force && !opts?.expanded
-    render(survey, { startCollapsed })
+    render(survey, { startCollapsed, force: opts?.force })
   })
 }
 
 function armTriggers() {
   const surveys = state.config?.surveys || []
   for (const survey of surveys) {
+    if (survey.type === 'helpful') continue
     if (state.armed.has(survey.id) || !canAutoShow(survey)) continue
     const type = String(survey.trigger?.type || 'manual')
     if (type === 'manual') continue
@@ -722,6 +918,8 @@ function boot() {
 
   quietAsync(async () => {
     await loadConfig()
+    mountHelpfulSlots()
+    watchHelpfulSlots()
     armTriggers()
   })
 }

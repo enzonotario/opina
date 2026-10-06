@@ -26,14 +26,31 @@ describe('SurveyCreateSchema', () => {
     }
   })
 
-  it('accepts delay of 0ms (immediate-like)', () => {
+  it('accepts helpful with options', () => {
     const parsed = v.safeParse(SurveyCreateSchema, {
-      type: 'csat',
-      question: { es: 'x' },
-      trigger: { type: 'delay', ms: 0 },
-      frequency: { mode: 'until_submit' },
+      type: 'helpful',
+      question: {
+        es: '¿Te resultó útil?',
+        en: 'Was this helpful?',
+      },
+      appearance: {
+        imageUrl: 'https://cdn.example.com/logo.svg',
+        options: [
+          { value: 4, label: { es: 'Muy útil', en: 'Very helpful' } },
+          { value: 3, label: { es: 'Útil', en: 'Helpful' } },
+          { value: 2, label: { es: 'No útil', en: 'Not helpful' } },
+          { value: 1, label: { es: 'Confuso', en: 'Confusing' } },
+        ],
+      },
+      trigger: { type: 'manual' },
+      frequency: { mode: 'once' },
     })
     expect(parsed.success).toBe(true)
+    if (parsed.success) {
+      expect(parsed.output.type).toBe('helpful')
+      expect(parsed.output.appearance?.options).toHaveLength(4)
+      expect(parsed.output.appearance?.imageUrl).toBe('https://cdn.example.com/logo.svg')
+    }
   })
 })
 

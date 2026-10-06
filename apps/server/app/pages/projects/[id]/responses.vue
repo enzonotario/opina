@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { ProjectDto } from '../../../shared/projects'
-import type { SurveyDto } from '../../../shared/surveys'
+import type { ProjectDto } from '#shared/projects'
+import type { SurveyDto } from '#shared/surveys'
+import { DEFAULT_HELPFUL_OPTIONS } from '#shared/surveys'
 
 const EMOJIS = ['😠', '🙁', '😐', '🙂', '😍']
 
@@ -21,6 +22,12 @@ if (error.value) {
 const { data: surveysData } = await useFetch<{ surveys: SurveyDto[] }>(
   () => `/api/admin/projects/${id.value}/surveys`,
 )
+
+const surveysById = computed(() => {
+  const map = new Map<string, SurveyDto>()
+  for (const s of surveysData.value?.surveys || []) map.set(s.id, s)
+  return map
+})
 
 const q = ref('')
 const hasComment = ref<'all' | 'yes' | 'no'>('all')
@@ -124,10 +131,41 @@ function fmt(ts: number) {
   })
 }
 
-function reaction(score: number | null) {
+function pickI18n(map: Record<string, string> | undefined, locale: string, fallback: string) {
+  if (!map) return fallback
+  return map[locale] || map.es || map.en || Object.values(map).find(Boolean) || fallback
+}
+
+function surveyName(surveyId: string) {
+  return surveysById.value.get(surveyId)?.name || surveyId
+}
+
+function surveyTypeLabel(surveyId: string) {
+  const type = surveysById.value.get(surveyId)?.type
+  if (type === 'helpful') return 'Page feedback'
+  if (type === 'thumbs') return 'Thumbs'
+  if (type === 'csat') return 'Rating'
+  return type || ''
+}
+
+function reaction(score: number | null, surveyId?: string) {
   if (score == null) return '—'
+  const survey = surveyId ? surveysById.value.get(surveyId) : undefined
+  if (survey?.type === 'helpful') {
+    const options = survey.appearance.options?.length === 4
+      ? survey.appearance.options
+      : DEFAULT_HELPFUL_OPTIONS
+    const opt = options.find(o => o.value === score)
+    const locale = survey.appearance.locale || 'es'
+    return opt ? pickI18n(opt.label, locale, String(score)) : String(score)
+  }
+  if (survey?.type === 'thumbs') {
+    if (score === 1) return '👍'
+    if (score === 0) return '👎'
+    return String(score)
+  }
   if (score === 0) return '👎'
-  if (score >= 1 && score <= 5) return `${EMOJIS[score - 1]}`
+  if (score >= 1 && score <= 5) return EMOJIS[score - 1]!
   return String(score)
 }
 
@@ -256,6 +294,9 @@ const surveyItems = computed(() => [
                   Reaction
                 </th>
                 <th class="px-3 py-2.5 font-medium">
+                  Survey
+                </th>
+                <th class="px-3 py-2.5 font-medium">
                   Page
                 </th>
                 <th class="px-3 py-2.5 font-medium">
@@ -300,8 +341,18 @@ const surveyItems = computed(() => [
                     {{ row.comment || '—' }}
                   </p>
                 </td>
-                <td class="px-3 py-2 whitespace-nowrap text-base">
-                  {{ reaction(row.score) }}
+                <td class="px-3 py-2 whitespace-nowrap text-sm text-highlighted">
+                  {{ reaction(row.score, row.surveyId) }}
+                </td>
+                <td class="px-3 py-2">
+                  <div class="min-w-0 max-w-40">
+                    <p class="truncate text-highlighted text-sm">
+                      {{ surveyName(row.surveyId) }}
+                    </p>
+                    <p class="text-[11px] text-muted truncate">
+                      {{ surveyTypeLabel(row.surveyId) }}
+                    </p>
+                  </div>
                 </td>
                 <td class="px-3 py-2">
                   <span
@@ -393,10 +444,19 @@ const surveyItems = computed(() => [
             >
             <div class="space-y-1">
               <p class="text-xs text-muted">
+                Survey
+              </p>
+              <p class="text-sm">
+                {{ surveyName(selected.surveyId) }}
+                <span class="text-muted">· {{ surveyTypeLabel(selected.surveyId) }}</span>
+              </p>
+            </div>
+            <div class="space-y-1">
+              <p class="text-xs text-muted">
                 Reaction
               </p>
               <p class="text-lg">
-                {{ reaction(selected.score) }}
+                {{ reaction(selected.score, selected.surveyId) }}
               </p>
             </div>
             <div class="space-y-1">

@@ -6,7 +6,7 @@ import type {
   SurveyFrequency,
   SurveyTrigger,
 } from '#shared/surveys'
-import { DEFAULT_APPEARANCE } from '#shared/surveys'
+import { DEFAULT_APPEARANCE, DEFAULT_HELPFUL_OPTIONS } from '#shared/surveys'
 
 const route = useRoute()
 const projectId = computed(() => String(route.params.id))
@@ -54,6 +54,7 @@ function initialEnabledLocales(survey: SurveyDto): string[] {
     survey.thanks,
     survey.appearance.lowLabel,
     survey.appearance.highLabel,
+    ...(survey.appearance.options || []).map(o => o.label),
   ]) {
     if (!map) continue
     for (const code of Object.keys(map)) {
@@ -64,8 +65,13 @@ function initialEnabledLocales(survey: SurveyDto): string[] {
   return AVAILABLE_LOCALES.map(locale => locale.code).filter(code => found.has(code))
 }
 
+function normalizeType(value: string): 'csat' | 'thumbs' | 'helpful' {
+  if (value === 'thumbs' || value === 'helpful') return value
+  return 'csat'
+}
+
 const name = ref(data.value!.survey.name)
-const type = ref<'csat' | 'thumbs'>(data.value!.survey.type === 'thumbs' ? 'thumbs' : 'csat')
+const type = ref<'csat' | 'thumbs' | 'helpful'>(normalizeType(data.value!.survey.type))
 const question = toI18nMap(data.value!.survey.question)
 const followUp = toI18nMap(data.value!.survey.followUp)
 const thanks = toI18nMap(data.value!.survey.thanks, {
@@ -80,7 +86,39 @@ const appearance = reactive<SurveyAppearance>({
   ...data.value!.survey.appearance,
   lowLabel: { ...DEFAULT_APPEARANCE.lowLabel, ...data.value!.survey.appearance.lowLabel },
   highLabel: { ...DEFAULT_APPEARANCE.highLabel, ...data.value!.survey.appearance.highLabel },
+  imageUrl: data.value!.survey.appearance.imageUrl || '',
+  options: (data.value!.survey.appearance.options?.length === 4
+    ? data.value!.survey.appearance.options
+    : DEFAULT_HELPFUL_OPTIONS
+  ).map(o => ({
+    value: o.value,
+    label: { ...o.label },
+  })),
 })
+
+const config = useRuntimeConfig()
+const { data: projectData } = await useFetch<{ project: { publicKey: string } }>(
+  () => `/api/admin/projects/${projectId.value}`,
+)
+const publicUrl = computed(() =>
+  String(config.public.url || 'http://localhost:3000').replace(/\/$/, ''),
+)
+const slotSnippet = computed(() => {
+  const key = projectData.value?.project.publicKey || 'pk_xxx'
+  return [
+    `<div data-opina-slot="${surveyId.value}"></div>`,
+    '<script',
+    `  src="${publicUrl.value}/widget.js"`,
+    `  data-key="${key}"`,
+    '  defer',
+    '></' + 'script>',
+  ].join('\n')
+})
+
+async function copySlotSnippet() {
+  await navigator.clipboard.writeText(slotSnippet.value)
+  toast.add({ title: 'Snippet copied', color: 'success' })
+}
 
 if (!enabledLocales.value.includes(appearance.locale || 'es')) {
   appearance.locale = enabledLocales.value[0] || 'es'
@@ -134,7 +172,9 @@ const previewQuestion = computed(() => pickText(question.value))
 const previewFollowUp = computed(() => pickText(followUp.value))
 const previewThanks = computed(() => pickText(thanks.value))
 
-const triggerType = ref<SurveyTrigger['type']>(data.value!.survey.trigger.type)
+const triggerType = ref<SurveyTrigger['type']>(
+  data.value!.survey.type === 'helpful' ? 'manual' : data.value!.survey.trigger.type,
+)
 const triggerMs = ref(
   data.value!.survey.trigger.type === 'delay'
     ? Math.round(Number(data.value!.survey.trigger.ms) / 1000)
@@ -150,6 +190,18 @@ const triggerCount = ref(
     ? Number(data.value!.survey.trigger.count)
     : 3,
 )
+
+watch(type, (next) => {
+  if (next === 'helpful') {
+    triggerType.value = 'manual'
+    if (!appearance.options || appearance.options.length !== 4) {
+      appearance.options = DEFAULT_HELPFUL_OPTIONS.map(o => ({
+        value: o.value,
+        label: { ...o.label },
+      }))
+    }
+  }
+})
 
 const includePaths = ref((data.value!.survey.targeting.include || []).join('\n'))
 const excludePaths = ref((data.value!.survey.targeting.exclude || []).join('\n'))
@@ -211,6 +263,13 @@ function buildBody() {
   const locale = enabledLocales.value.includes(appearance.locale || '')
     ? appearance.locale
     : enabledLocales.value[0] || 'es'
+  const options = (appearance.options || DEFAULT_HELPFUL_OPTIONS).map(o => ({
+    value: o.value,
+    label: (() => {
+      const picked = pickEnabled(o.label || {})
+      return Object.keys(picked).length ? picked : { [locale!]: String(o.value) }
+    })(),
+  }))
 
   return {
     name: name.value.trim() || 'Survey',
@@ -222,9 +281,13 @@ function buildBody() {
       ...appearance,
       lowLabel: Object.keys(lowLabel).length ? lowLabel : { [locale!]: '' },
       highLabel: Object.keys(highLabel).length ? highLabel : { [locale!]: '' },
+      options,
+      imageUrl: (appearance.imageUrl || '').trim(),
       locale,
+      includeScreenshot: type.value === 'helpful' ? false : appearance.includeScreenshot,
+      position: type.value === 'helpful' ? 'right' : appearance.position,
     },
-    trigger: buildTrigger(),
+    trigger: type.value === 'helpful' ? { type: 'manual' as const } : buildTrigger(),
     targeting: {
       include: pagesMode.value === 'specific' ? lines(includePaths.value) : [],
       exclude: lines(excludePaths.value),
@@ -360,6 +423,7 @@ const tabLinks = computed(() => [[{
                   :items="[
                     { label: 'Rating scale', value: 'csat' },
                     { label: 'Thumbs up / down', value: 'thumbs' },
+                    { label: 'Page feedback', value: 'helpful' },
                   ]"
                 />
               </UFormField>
@@ -403,6 +467,28 @@ const tabLinks = computed(() => [[{
                       :locale-labels="localeTabLabels"
                     />
                   </UFormField>
+                </div>
+                <div
+                  v-if="type === 'helpful'"
+                  class="space-y-3"
+                >
+                  <p class="text-xs text-muted">
+                    Four options (score 4 → 1). Visitors pick one pill, then can leave an optional comment.
+                  </p>
+                  <div
+                    v-for="(opt, idx) in appearance.options"
+                    :key="opt.value"
+                    class="rounded-md border border-default p-3 space-y-2"
+                  >
+                    <p class="text-xs font-medium text-muted">
+                      Option {{ idx + 1 }} · score {{ opt.value }}
+                    </p>
+                    <SurveyI18nTextField
+                      v-model="opt.label"
+                      :locales="enabledLocales"
+                      :locale-labels="localeTabLabels"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -465,6 +551,29 @@ const tabLinks = computed(() => [[{
                   class="w-full"
                   :items="localeSelectItems"
                 />
+              </UFormField>
+
+              <UFormField
+                v-if="type === 'helpful'"
+                label="Logo image URL"
+                description="Shown to the left of the question (like Nuxt docs). Use your site/page logo URL."
+              >
+                <div class="flex items-start gap-3">
+                  <img
+                    v-if="(appearance.imageUrl || '').trim()"
+                    :src="appearance.imageUrl"
+                    alt=""
+                    class="size-10 rounded-lg border border-default object-contain bg-default shrink-0"
+                    loading="lazy"
+                    decoding="async"
+                    referrerpolicy="no-referrer"
+                  >
+                  <UInput
+                    v-model="appearance.imageUrl"
+                    class="w-full"
+                    placeholder="https://cdn.example.com/logo.svg"
+                  />
+                </div>
               </UFormField>
 
               <UFormField
@@ -541,7 +650,10 @@ const tabLinks = computed(() => [[{
                 </div>
               </UFormField>
 
-              <UFormField label="Position">
+              <UFormField
+                v-if="type !== 'helpful'"
+                label="Position"
+              >
                 <URadioGroup
                   v-model="appearance.position"
                   :items="[
@@ -651,7 +763,31 @@ const tabLinks = computed(() => [[{
             </template>
 
             <template v-else>
-              <fieldset class="space-y-3">
+              <fieldset
+                v-if="type === 'helpful'"
+                class="space-y-3"
+              >
+                <legend class="text-sm font-medium text-highlighted mb-1">
+                  Install on your page
+                </legend>
+                <p class="text-xs text-muted">
+                  Page feedback mounts inline where you place this slot. It does not use the floating panel.
+                </p>
+                <pre class="overflow-x-auto rounded-lg border border-default bg-elevated/50 p-3 text-xs font-mono whitespace-pre-wrap">{{ slotSnippet }}</pre>
+                <UButton
+                  size="sm"
+                  color="neutral"
+                  variant="soft"
+                  label="Copy snippet"
+                  icon="i-lucide-copy"
+                  @click="copySlotSnippet"
+                />
+              </fieldset>
+
+              <fieldset
+                v-else
+                class="space-y-3"
+              >
                 <legend class="text-sm font-medium text-highlighted mb-1">
                   When to show
                 </legend>
@@ -738,7 +874,10 @@ const tabLinks = computed(() => [[{
                 </label>
               </fieldset>
 
-              <fieldset class="space-y-3 pt-4 border-t border-default">
+              <fieldset
+                v-if="type !== 'helpful'"
+                class="space-y-3 pt-4 border-t border-default"
+              >
                 <legend class="text-sm font-medium text-highlighted mb-1">
                   Screenshots
                 </legend>
@@ -775,8 +914,8 @@ const tabLinks = computed(() => [[{
                     class="mt-1"
                   >
                   <span class="space-y-0.5">
-                    <span class="block">Only once, even if they do not respond</span>
-                    <span class="block text-xs text-muted">If they close it, they won't see it again</span>
+                    <span class="block">{{ type === 'helpful' ? 'Only once per page' : 'Only once, even if they do not respond' }}</span>
+                    <span class="block text-xs text-muted">{{ type === 'helpful' ? 'Tracked separately for each URL path' : 'If they close it, they won\'t see it again' }}</span>
                   </span>
                 </label>
                 <label class="flex items-start gap-2 text-sm">
@@ -827,7 +966,7 @@ const tabLinks = computed(() => [[{
                   :variant="previewStep === 'comment' ? 'solid' : 'ghost'"
                   color="neutral"
                   label="2"
-                  :disabled="!previewFollowUp"
+                  :disabled="type !== 'helpful' && !previewFollowUp"
                   @click="previewStep = 'comment'"
                 />
                 <UButton

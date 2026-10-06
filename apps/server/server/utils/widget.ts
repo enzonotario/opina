@@ -63,6 +63,7 @@ export function scoreRange(type: string): [number, number] | null {
   switch (type) {
     case 'csat': return [1, 5]
     case 'thumbs': return [0, 1]
+    case 'helpful': return [1, 4]
     case 'nps': return [0, 10]
     case 'ces': return [1, 7]
     case 'text': return null
