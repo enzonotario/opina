@@ -29,10 +29,18 @@ const surveysById = computed(() => {
   return map
 })
 
-const q = ref('')
-const hasComment = ref<'all' | 'yes' | 'no'>('all')
-const path = ref('')
-const surveyFilter = ref<string>('all')
+const q = ref(typeof route.query.q === 'string' ? route.query.q : '')
+const hasComment = ref<'all' | 'yes' | 'no'>(
+  route.query.hasComment === 'yes' || route.query.hasComment === 'true'
+    ? 'yes'
+    : route.query.hasComment === 'no' || route.query.hasComment === 'false'
+      ? 'no'
+      : 'all',
+)
+const path = ref(typeof route.query.path === 'string' ? route.query.path : '')
+const surveyFilter = ref<string>(
+  typeof route.query.surveyId === 'string' ? route.query.surveyId : 'all',
+)
 const page = ref(0)
 const pageSize = 50
 
@@ -71,7 +79,7 @@ const commentHeader = computed(() => {
   return 'Response'
 })
 
-const selected = ref<null | {
+type ResponseRow = {
   id: string
   score: number | null
   comment: string | null
@@ -81,7 +89,48 @@ const selected = ref<null | {
   createdAt: number
   screenshotPath: string | null
   surveyId: string
-}>(null)
+}
+
+const selected = ref<ResponseRow | null>(null)
+
+async function openResponseById(responseId: string) {
+  const fromList = (data.value?.items as ResponseRow[] | undefined)?.find(r => r.id === responseId)
+  if (fromList) {
+    selected.value = fromList
+    return
+  }
+  try {
+    selected.value = await $fetch<ResponseRow>(
+      `/api/admin/projects/${id.value}/responses/${responseId}`,
+    )
+  }
+  catch {
+    toast.add({ title: 'Response not found', color: 'error' })
+    clearResponseQuery()
+  }
+}
+
+function clearResponseQuery() {
+  if (!route.query.response) return
+  const next = { ...route.query }
+  delete next.response
+  navigateTo({ path: route.path, query: next }, { replace: true })
+}
+
+function closeSelected() {
+  selected.value = null
+  clearResponseQuery()
+}
+
+watch(
+  () => [String(route.query.response || ''), data.value?.items] as const,
+  ([responseId]) => {
+    if (!responseId) return
+    if (selected.value?.id === responseId) return
+    void openResponseById(responseId)
+  },
+  { immediate: true },
+)
 
 function exportUrl(format: 'csv' | 'json') {
   const params = new URLSearchParams({ format })
@@ -109,7 +158,7 @@ async function removeResponse(row: { id: string, comment: string | null }) {
     await $fetch(`/api/admin/projects/${id.value}/responses/${row.id}`, {
       method: 'DELETE',
     })
-    if (selected.value?.id === row.id) selected.value = null
+    if (selected.value?.id === row.id) closeSelected()
     toast.add({ title: 'Response deleted', color: 'success' })
     await refresh()
   } catch (e: unknown) {
@@ -315,21 +364,17 @@ const surveyItems = computed(() => [
               <tr
                 v-for="row in data.items"
                 :key="row.id"
-                class="hover:bg-elevated/40"
+                class="hover:bg-elevated/40 cursor-pointer"
+                :class="{ 'bg-elevated/50': selected?.id === row.id }"
+                @click="selected = row"
               >
                 <td class="px-3 py-2">
-                  <button
+                  <img
                     v-if="row.screenshotPath"
-                    type="button"
-                    class="block"
-                    @click="selected = row"
+                    :src="`/api/admin/projects/${id}/responses/${row.id}/screenshot`"
+                    alt=""
+                    class="h-14 w-24 object-cover rounded-md border border-default"
                   >
-                    <img
-                      :src="`/api/admin/projects/${id}/responses/${row.id}/screenshot`"
-                      alt=""
-                      class="h-14 w-24 object-cover rounded-md border border-default"
-                    >
-                  </button>
                   <div
                     v-else
                     class="h-14 w-24 rounded-md border border-dashed border-default bg-elevated/50 flex items-center justify-center text-[10px] text-muted"
@@ -377,7 +422,10 @@ const surveyItems = computed(() => [
                     :title="row.device || 'desktop'"
                   />
                 </td>
-                <td class="px-3 py-2 text-right">
+                <td
+                  class="px-3 py-2 text-right"
+                  @click.stop
+                >
                   <div class="inline-flex items-center gap-1">
                     <UButton
                       size="xs"
@@ -430,7 +478,7 @@ const surveyItems = computed(() => [
         :open="!!selected"
         title="Response"
         :ui="{ content: 'max-w-lg' }"
-        @update:open="(v: boolean) => { if (!v) selected = null }"
+        @update:open="(v: boolean) => { if (!v) closeSelected() }"
       >
         <template #body>
           <div

@@ -44,6 +44,38 @@ function parseMeta(value: string) {
   }
 }
 
+function toResponseDto(row: typeof responses.$inferSelect): ResponseDto {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    surveyId: row.surveyId,
+    score: row.score,
+    comment: row.comment,
+    urlPath: row.urlPath,
+    urlHost: row.urlHost,
+    locale: row.locale,
+    device: row.device,
+    visitorId: row.visitorId,
+    metadata: parseMeta(row.metadata),
+    screenshotPath: row.screenshotPath || null,
+    createdAt: row.createdAt,
+  }
+}
+
+export function getResponse(projectId: string, responseId: string): ResponseDto {
+  getProjectOrThrow(projectId)
+  const row = useDb()
+    .select()
+    .from(responses)
+    .where(and(eq(responses.id, responseId), eq(responses.projectId, projectId)))
+    .get()
+
+  if (!row) {
+    throw createError({ statusCode: 404, statusMessage: 'Response not found' })
+  }
+  return toResponseDto(row)
+}
+
 export function listResponses(projectId: string, filters: ResponseFilters = {}) {
   getProjectOrThrow(projectId)
   const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200)
@@ -88,36 +120,12 @@ export function listResponses(projectId: string, filters: ResponseFilters = {}) 
     total: Number(totalRow?.count || 0),
     limit,
     offset,
-    items: rows.map((row): ResponseDto => ({
-      id: row.id,
-      projectId: row.projectId,
-      surveyId: row.surveyId,
-      score: row.score,
-      comment: row.comment,
-      urlPath: row.urlPath,
-      urlHost: row.urlHost,
-      locale: row.locale,
-      device: row.device,
-      visitorId: row.visitorId,
-      metadata: parseMeta(row.metadata),
-      screenshotPath: row.screenshotPath || null,
-      createdAt: row.createdAt,
-    })),
+    items: rows.map(toResponseDto),
   }
 }
 
 export function deleteResponse(projectId: string, responseId: string) {
-  getProjectOrThrow(projectId)
-  const row = useDb()
-    .select()
-    .from(responses)
-    .where(and(eq(responses.id, responseId), eq(responses.projectId, projectId)))
-    .get()
-
-  if (!row) {
-    throw createError({ statusCode: 404, statusMessage: 'Response not found' })
-  }
-
+  const row = getResponse(projectId, responseId)
   deleteScreenshot(row.screenshotPath)
   useDb().delete(responses).where(eq(responses.id, responseId)).run()
   return { ok: true as const }

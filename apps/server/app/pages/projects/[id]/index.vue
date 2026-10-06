@@ -65,6 +65,22 @@ function reaction(score: number | null) {
   if (score == null || score < 1 || score > 5) return '—'
   return EMOJIS[score - 1]
 }
+
+function relativeTime(ms: number) {
+  const diff = Date.now() - ms
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'just now'
+  if (mins < 60) return `${mins}m ago`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
+
+function responsesTo(query?: Record<string, string>) {
+  const q = query ? `?${new URLSearchParams(query)}` : ''
+  return `/projects/${project.value.id}/responses${q}`
+}
 </script>
 
 <template>
@@ -146,7 +162,10 @@ function reaction(score: number | null) {
               Out of 5
             </p>
           </div>
-          <div class="rounded-xl bg-elevated/60 ring-1 ring-default p-4">
+          <NuxtLink
+            :to="responsesTo()"
+            class="rounded-xl bg-elevated/60 ring-1 ring-default p-4 hover:bg-elevated transition-colors"
+          >
             <p class="text-xs font-medium text-muted">
               Responses
             </p>
@@ -156,8 +175,11 @@ function reaction(score: number | null) {
             <p class="text-xs mt-1.5 text-muted">
               {{ stats.previousTotal }} previous period
             </p>
-          </div>
-          <div class="rounded-xl bg-elevated/60 ring-1 ring-default p-4">
+          </NuxtLink>
+          <NuxtLink
+            :to="responsesTo({ hasComment: 'yes' })"
+            class="rounded-xl bg-elevated/60 ring-1 ring-default p-4 hover:bg-elevated transition-colors"
+          >
             <p class="text-xs font-medium text-muted">
               With comment
             </p>
@@ -167,7 +189,7 @@ function reaction(score: number | null) {
             <p class="text-xs mt-1.5 text-muted">
               {{ stats.total ? Math.round((stats.withComment / stats.total) * 100) : 0 }}% of responses
             </p>
-          </div>
+          </NuxtLink>
         </div>
 
         <div class="grid gap-4 lg:grid-cols-5">
@@ -225,15 +247,25 @@ function reaction(score: number | null) {
               <li
                 v-for="item in stats.recentComments.slice(0, 6)"
                 :key="item.id"
-                class="px-1 py-3 first:pt-0"
+                class="first:pt-0"
               >
-                <div class="flex items-start justify-between gap-2 mb-1">
-                  <span class="text-[11px] font-mono text-muted truncate">{{ item.urlPath }}</span>
-                  <span class="text-sm shrink-0">{{ reaction(item.score) }}</span>
-                </div>
-                <p class="text-sm text-highlighted line-clamp-2">
-                  {{ item.comment }}
-                </p>
+                <NuxtLink
+                  :to="responsesTo({ response: item.id })"
+                  class="group block px-1 py-3 rounded-md hover:bg-elevated/60 transition-colors"
+                >
+                  <div class="flex items-start justify-between gap-2 mb-1">
+                    <span class="text-[11px] font-mono text-muted truncate">{{ item.urlPath }}</span>
+                    <div class="shrink-0 text-right">
+                      <span class="text-sm">{{ reaction(item.score) }}</span>
+                      <p class="text-[11px] text-muted">
+                        {{ relativeTime(item.createdAt) }}
+                      </p>
+                    </div>
+                  </div>
+                  <p class="text-sm text-highlighted line-clamp-2 group-hover:underline decoration-muted/60 underline-offset-2">
+                    {{ item.comment }}
+                  </p>
+                </NuxtLink>
               </li>
             </ul>
             <p
@@ -256,12 +288,17 @@ function reaction(score: number | null) {
             <li
               v-for="page in stats.worstPages"
               :key="page.path"
-              class="py-2.5 flex items-center justify-between gap-3 first:pt-0"
+              class="first:pt-0"
             >
-              <span class="text-sm truncate">{{ page.path }}</span>
-              <span class="text-sm shrink-0 tabular-nums text-muted">
-                {{ page.csatPercent }}% · {{ page.count }} responses
-              </span>
+              <NuxtLink
+                :to="responsesTo({ path: page.path })"
+                class="py-2.5 flex items-center justify-between gap-3 rounded-md hover:bg-elevated/60 transition-colors px-1 -mx-1"
+              >
+                <span class="text-sm truncate">{{ page.path }}</span>
+                <span class="text-sm shrink-0 tabular-nums text-muted">
+                  {{ page.csatPercent }}% · {{ page.count }} responses
+                </span>
+              </NuxtLink>
             </li>
           </ul>
           <p

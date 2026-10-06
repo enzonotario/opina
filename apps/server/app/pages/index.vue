@@ -238,28 +238,30 @@ function relativeTime(ms: number) {
               <li
                 v-for="item in stats.recentComments.slice(0, 8)"
                 :key="item.id"
-                class="px-1 py-3 first:pt-0"
+                class="first:pt-0"
               >
-                <div class="flex items-start justify-between gap-2 mb-1">
-                  <div class="min-w-0">
-                    <NuxtLink
-                      :to="`/projects/${item.projectId}/responses`"
-                      class="text-xs font-medium text-highlighted hover:underline truncate block"
-                    >
-                      {{ item.projectName }}
-                    </NuxtLink>
-                    <span class="text-[11px] font-mono text-muted truncate block">{{ item.urlPath }}</span>
+                <NuxtLink
+                  :to="`/projects/${item.projectId}/responses?response=${item.id}`"
+                  class="block px-1 py-3 rounded-md hover:bg-elevated/60 transition-colors"
+                >
+                  <div class="flex items-start justify-between gap-2 mb-1">
+                    <div class="min-w-0">
+                      <span class="text-xs font-medium text-highlighted truncate block">
+                        {{ item.projectName }}
+                      </span>
+                      <span class="text-[11px] font-mono text-muted truncate block">{{ item.urlPath }}</span>
+                    </div>
+                    <div class="shrink-0 text-right">
+                      <span class="text-sm">{{ reaction(item.score) }}</span>
+                      <p class="text-[11px] text-muted">
+                        {{ relativeTime(item.createdAt) }}
+                      </p>
+                    </div>
                   </div>
-                  <div class="shrink-0 text-right">
-                    <span class="text-sm">{{ reaction(item.score) }}</span>
-                    <p class="text-[11px] text-muted">
-                      {{ relativeTime(item.createdAt) }}
-                    </p>
-                  </div>
-                </div>
-                <p class="text-sm text-highlighted line-clamp-2">
-                  {{ item.comment }}
-                </p>
+                  <p class="text-sm text-highlighted line-clamp-2">
+                    {{ item.comment }}
+                  </p>
+                </NuxtLink>
               </li>
             </ul>
             <p
