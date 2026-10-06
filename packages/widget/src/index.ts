@@ -612,11 +612,12 @@ function show(surveyId?: string, opts?: ShowOptions) {
     if (!state.config) await loadConfig()
     const survey = resolveSurvey(surveyId)
     if (!survey) return
+    // Manual opens (Opina.show / data-opina) skip frequency, path and device gates.
     if (!opts?.force && isFrequencyBlocked(survey)) {
       emit('suppressed', { surveyId: survey.id, reason: 'frequency' })
       return
     }
-    if (!pathAllowed(survey)) {
+    if (!opts?.force && !pathAllowed(survey)) {
       emit('suppressed', { surveyId: survey.id, reason: 'path' })
       return
     }
@@ -714,8 +715,9 @@ function boot() {
   document.addEventListener('click', (ev) => {
     const el = (ev.target as Element | null)?.closest?.('[data-opina]') as HTMLElement | null
     if (!el) return
+    ev.preventDefault()
     const id = el.getAttribute('data-opina') || undefined
-    show(id === '' ? undefined : id, { force: true })
+    show(id === '' ? undefined : id, { force: true, expanded: true })
   })
 
   quietAsync(async () => {
