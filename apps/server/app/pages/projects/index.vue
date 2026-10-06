@@ -46,12 +46,10 @@ async function createProject() {
     await refresh()
     toast.add({ title: 'Project created', color: 'success' })
     await navigateTo(`/projects/${project.id}`)
-  }
-  catch (e: unknown) {
+  } catch (e: unknown) {
     const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
     error.value = err.data?.statusMessage || err.statusMessage || 'Could not create project'
-  }
-  finally {
+  } finally {
     pending.value = false
   }
 }

@@ -98,7 +98,7 @@ function copyExport(format: 'csv' | 'json') {
 
 const deletingId = ref<string | null>(null)
 
-async function removeResponse(row: { id: string; comment: string | null }) {
+async function removeResponse(row: { id: string, comment: string | null }) {
   const preview = row.comment?.trim()
     ? `“${row.comment.trim().slice(0, 48)}${row.comment.trim().length > 48 ? '…' : ''}”`
     : 'this response'
@@ -112,7 +112,8 @@ async function removeResponse(row: { id: string; comment: string | null }) {
     if (selected.value?.id === row.id) selected.value = null
     toast.add({ title: 'Response deleted', color: 'success' })
     await refresh()
-  } catch (err: any) {
+  } catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
     toast.add({
       title: err.data?.statusMessage || err.statusMessage || 'Delete failed',
       color: 'error',

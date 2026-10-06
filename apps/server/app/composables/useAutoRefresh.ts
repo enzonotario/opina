@@ -1,4 +1,4 @@
-type RefreshFn = () => void | Promise<unknown>
+type RefreshFn = () => unknown
 
 /**
  * Periodically call `refresh` while the tab is visible.

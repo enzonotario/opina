@@ -15,8 +15,14 @@ describe('isOriginAllowed', () => {
     expect(isOriginAllowed('https://evil.com', ['https://a.com'])).toBe(false)
   })
 
-  it('treats localhost and 127.0.0.1 as distinct', () => {
-    expect(isOriginAllowed('http://127.0.0.1:3001', ['http://localhost:3001'])).toBe(false)
-    expect(isOriginAllowed('http://127.0.0.1:3001', ['http://127.0.0.1:3001'])).toBe(true)
+  it('allows localhost / 127.0.0.1 on any port for local embeds', () => {
+    expect(isOriginAllowed('http://localhost:3002', ['https://comparadolar.ar'])).toBe(true)
+    expect(isOriginAllowed('http://127.0.0.1:3002', [])).toBe(true)
+  })
+
+  it('still rejects non-local origins not in the list', () => {
+    expect(isOriginAllowed('https://evil.com', ['https://comparadolar.ar'])).toBe(false)
   })
 })
+
+

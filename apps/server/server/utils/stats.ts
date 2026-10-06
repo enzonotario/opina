@@ -355,7 +355,7 @@ export function getAccountStats(days = 30): AccountStats {
   }
 
   const projectRows = allProjects
-    .map(p => {
+    .map((p) => {
       const entry = byProject.get(p.id)!
       return {
         id: p.id,
