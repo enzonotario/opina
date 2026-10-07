@@ -1,9 +1,30 @@
 <script setup lang="ts">
+type DailyPoint = { day: string, count: number, csatPercent: number | null }
+
+type Series = {
+  id: string
+  name: string
+  color: string
+  daily: DailyPoint[]
+}
+
 const props = defineProps<{
-  daily: Array<{ day: string, count: number, csatPercent: number | null }>
+  daily: DailyPoint[]
+  series?: Series[]
 }>()
 
-const maxCount = computed(() => Math.max(1, ...props.daily.map(d => d.count)))
+const grouped = computed(() => (props.series?.length || 0) > 1)
+
+const maxCount = computed(() => {
+  if (!grouped.value) {
+    return Math.max(1, ...props.daily.map(d => d.count))
+  }
+  return Math.max(
+    1,
+    ...(props.series || []).flatMap(s => s.daily.map(p => p.count)),
+  )
+})
+
 const total = computed(() => props.daily.reduce((n, d) => n + d.count, 0))
 
 const points = computed(() => {
@@ -12,9 +33,36 @@ const points = computed(() => {
   return sparse ? data.slice(-14) : data
 })
 
+function countFor(series: Series, day: string) {
+  return series.daily.find(p => p.day === day)?.count || 0
+}
+
+function dayTotal(day: string) {
+  if (!grouped.value) {
+    return props.daily.find(p => p.day === day)?.count || 0
+  }
+  return (props.series || []).reduce((sum, s) => sum + countFor(s, day), 0)
+}
+
+function titleFor(day: string) {
+  if (!grouped.value) {
+    const point = props.daily.find(p => p.day === day)
+    return `${day}: ${point?.count || 0} responses${point?.csatPercent != null ? `, CSAT ${point.csatPercent}%` : ''}`
+  }
+  const parts = (props.series || [])
+    .filter(s => countFor(s, day) > 0)
+    .map(s => `${s.name}: ${countFor(s, day)}`)
+  return `${day}: ${dayTotal(day)} total${parts.length ? ` · ${parts.join(' · ')}` : ''}`
+}
+
 function label(day: string) {
   const d = new Date(`${day}T12:00:00`)
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function barHeight(count: number) {
+  if (!count) return '2px'
+  return `${Math.max(8, (count / maxCount.value) * 100)}%`
 }
 </script>
 
@@ -38,24 +86,56 @@ function label(day: string) {
         v-for="point in points"
         :key="point.day"
         class="flex-1 min-w-0 h-full flex flex-col justify-end items-center"
-        :title="`${point.day}: ${point.count} responses${point.csatPercent != null ? `, CSAT ${point.csatPercent}%` : ''}`"
+        :title="titleFor(point.day)"
       >
         <span
-          v-if="point.count"
+          v-if="dayTotal(point.day)"
           class="text-[10px] text-muted mb-1 tabular-nums"
-        >{{ point.count }}</span>
+        >{{ dayTotal(point.day) }}</span>
+
         <div
+          v-if="grouped"
+          class="w-full max-w-12 h-[calc(100%-1.25rem)] flex items-end justify-center gap-0.5"
+        >
+          <div
+            v-for="s in series"
+            :key="s.id"
+            class="flex-1 min-w-[3px] max-w-3.5 rounded-t-sm"
+            :class="countFor(s, point.day) ? '' : 'bg-elevated/80'"
+            :style="{
+              backgroundColor: countFor(s, point.day) ? s.color : undefined,
+              height: barHeight(countFor(s, point.day)),
+            }"
+          />
+        </div>
+
+        <div
+          v-else
           class="w-full max-w-8 rounded-t-sm transition-colors"
           :class="point.count ? 'bg-primary' : 'bg-elevated'"
-          :style="{
-            height: point.count ? `${Math.max(8, (point.count / maxCount) * 100)}%` : '2px',
-          }"
+          :style="{ height: barHeight(point.count) }"
         />
       </div>
     </div>
     <div class="flex justify-between text-[11px] text-muted">
       <span>{{ label(points[0]!.day) }}</span>
       <span>{{ label(points[points.length - 1]!.day) }}</span>
+    </div>
+    <div
+      v-if="grouped"
+      class="flex flex-wrap gap-x-3 gap-y-1.5 pt-0.5"
+    >
+      <span
+        v-for="s in series"
+        :key="s.id"
+        class="inline-flex items-center gap-1.5 text-[11px] text-muted"
+      >
+        <span
+          class="size-2.5 rounded-sm shrink-0 ring-1 ring-black/10 dark:ring-white/15"
+          :style="{ backgroundColor: s.color }"
+        />
+        <span class="truncate max-w-36">{{ s.name }}</span>
+      </span>
     </div>
   </div>
 </template>

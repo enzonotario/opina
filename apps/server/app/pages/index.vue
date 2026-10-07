@@ -9,6 +9,11 @@ type AccountStats = {
   projectCount: number
   distribution: Array<{ score: number, count: number }>
   daily: Array<{ day: string, count: number, csatPercent: number | null }>
+  dailyByProject: Array<{
+    projectId: string
+    projectName: string
+    daily: Array<{ day: string, count: number, csatPercent: number | null }>
+  }>
   projects: Array<{
     id: string
     name: string
@@ -34,6 +39,8 @@ type AccountStats = {
 }
 
 const EMOJIS = ['😠', '🙁', '😐', '🙂', '😍']
+// High-contrast palette so adjacent project bars read clearly.
+const CHART_COLORS = ['#16a34a', '#2563eb', '#c026d3', '#ea580c', '#0891b2', '#ca8a04', '#dc2626', '#4f46e5']
 
 const { data: statsData, status: statsStatus, refresh: refreshStats } = await useFetch<{ stats: AccountStats }>(
   '/api/admin/stats?days=30',
@@ -41,7 +48,27 @@ const { data: statsData, status: statsStatus, refresh: refreshStats } = await us
 
 const { autoRefresh } = useAutoRefresh(() => refreshStats())
 
+const chartGroup = useLocalStorage<'all' | 'projects'>('opina:chart-group', 'all')
+
 const stats = computed(() => statsData.value?.stats)
+
+const chartSeries = computed(() => {
+  const rows = stats.value?.dailyByProject || []
+  if (chartGroup.value !== 'projects' || rows.length < 2) return undefined
+  return rows.map((row, i) => ({
+    id: row.projectId,
+    name: row.projectName,
+    color: CHART_COLORS[i % CHART_COLORS.length]!,
+    daily: row.daily,
+  }))
+})
+
+function projectColor(projectId: string) {
+  const rows = stats.value?.dailyByProject || []
+  const i = rows.findIndex(r => r.projectId === projectId)
+  if (i < 0) return null
+  return CHART_COLORS[i % CHART_COLORS.length]!
+}
 
 function delta(current: number | null | undefined, previous: number | null | undefined) {
   if (current == null || previous == null) return null
@@ -187,13 +214,20 @@ function relativeTime(ms: number) {
                 :to="`/projects/${project.id}`"
                 class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 ring-1 ring-default hover:bg-elevated/50 transition-colors"
               >
-                <div class="min-w-0">
-                  <p class="text-sm font-medium text-highlighted truncate">
-                    {{ project.name }}
-                  </p>
-                  <p class="text-xs text-muted">
-                    {{ project.total }} responses · 30d
-                  </p>
+                <div class="min-w-0 flex items-start gap-2">
+                  <span
+                    v-if="projectColor(project.id)"
+                    class="mt-1.5 size-2.5 rounded-sm shrink-0 ring-1 ring-black/10 dark:ring-white/15"
+                    :style="{ backgroundColor: projectColor(project.id)! }"
+                  />
+                  <div class="min-w-0">
+                    <p class="text-sm font-medium text-highlighted truncate">
+                      {{ project.name }}
+                    </p>
+                    <p class="text-xs text-muted">
+                      {{ project.total }} responses · 30d
+                    </p>
+                  </div>
                 </div>
                 <p class="text-sm font-semibold tabular-nums shrink-0">
                   {{ project.csatPercent == null ? '—' : `${project.csatPercent}%` }}
@@ -205,13 +239,39 @@ function relativeTime(ms: number) {
 
         <div class="grid gap-4 lg:grid-cols-5">
           <section class="lg:col-span-3 rounded-xl ring-1 ring-default bg-default p-5 space-y-4">
-            <div class="flex items-center justify-between gap-2">
-              <h2 class="text-sm font-semibold text-highlighted">
-                Responses per day
-              </h2>
-              <span class="text-xs text-muted">All projects · 30 days</span>
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="min-w-0">
+                <h2 class="text-sm font-semibold text-highlighted">
+                  Responses per day
+                </h2>
+                <p class="text-xs text-muted mt-0.5">
+                  {{ chartGroup === 'projects' && (stats.dailyByProject?.length || 0) > 1
+                    ? 'Grouped by project · 30 days'
+                    : 'All projects · 30 days' }}
+                </p>
+              </div>
+              <UButtonGroup
+                v-if="(stats.dailyByProject?.length || 0) > 1"
+                size="xs"
+              >
+                <UButton
+                  :variant="chartGroup === 'all' ? 'solid' : 'ghost'"
+                  color="neutral"
+                  label="All"
+                  @click="chartGroup = 'all'"
+                />
+                <UButton
+                  :variant="chartGroup === 'projects' ? 'solid' : 'ghost'"
+                  color="neutral"
+                  label="By project"
+                  @click="chartGroup = 'projects'"
+                />
+              </UButtonGroup>
             </div>
-            <DailyChart :daily="stats.daily" />
+            <DailyChart
+              :daily="stats.daily"
+              :series="chartSeries"
+            />
             <div class="flex flex-wrap gap-1.5 pt-1">
               <span
                 v-for="bucket in stats.distribution"

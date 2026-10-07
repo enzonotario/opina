@@ -201,6 +201,13 @@ export function getProjectsSummary(days = 30) {
   return out
 }
 
+export type AccountDailyPoint = {
+  day: string
+  count: number
+  avg: number | null
+  csatPercent: number | null
+}
+
 export type AccountStats = Omit<ProjectStats, 'recentComments' | 'worstPages'> & {
   projectCount: number
   projects: Array<{
@@ -208,6 +215,11 @@ export type AccountStats = Omit<ProjectStats, 'recentComments' | 'worstPages'> &
     name: string
     total: number
     csatPercent: number | null
+  }>
+  dailyByProject: Array<{
+    projectId: string
+    projectName: string
+    daily: AccountDailyPoint[]
   }>
   recentComments: Array<{
     id: string
@@ -276,16 +288,28 @@ export function getAccountStats(days = 30): AccountStats {
     if (s >= 1 && s <= 4) helpfulDistMap.set(s, (helpfulDistMap.get(s) || 0) + 1)
   }
 
-  const byDay = new Map<string, number[]>()
+  const dayKeys: string[] = []
   for (let i = 0; i < days; i++) {
-    const d = dayKey(from + i * 86400000 + 12 * 3600000)
+    dayKeys.push(dayKey(from + i * 86400000 + 12 * 3600000))
+  }
+
+  const byDay = new Map<string, number[]>()
+  const byDayProject = new Map<string, Map<string, number[]>>()
+  for (const d of dayKeys) {
     byDay.set(d, [])
+    byDayProject.set(d, new Map())
   }
   for (const r of current) {
     if (r.score == null || r.surveyType !== 'csat') continue
     const key = dayKey(r.createdAt)
     const list = byDay.get(key)
     if (list) list.push(r.score)
+    const projectMap = byDayProject.get(key)
+    if (projectMap) {
+      const scores = projectMap.get(r.projectId) || []
+      scores.push(r.score)
+      projectMap.set(r.projectId, scores)
+    }
   }
 
   const pageMap = new Map<string, { projectId: string, scores: number[] }>()
@@ -366,6 +390,32 @@ export function getAccountStats(days = 30): AccountStats {
     })
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
 
+  const daily = dayKeys.map((day) => {
+    const scores = byDay.get(day) || []
+    return {
+      day,
+      count: scores.length,
+      avg: averageScore(scores),
+      csatPercent: csatPercent(scores),
+    }
+  })
+
+  const dailyByProject = projectRows
+    .filter(p => p.total > 0)
+    .map(p => ({
+      projectId: p.id,
+      projectName: p.name,
+      daily: dayKeys.map((day) => {
+        const scores = byDayProject.get(day)?.get(p.id) || []
+        return {
+          day,
+          count: scores.length,
+          avg: averageScore(scores),
+          csatPercent: csatPercent(scores),
+        }
+      }),
+    }))
+
   return {
     from,
     to,
@@ -385,12 +435,8 @@ export function getAccountStats(days = 30): AccountStats {
     thumbsPositivePercent: thumbs.length
       ? Math.round((thumbsPositive / thumbs.length) * 1000) / 10
       : null,
-    daily: [...byDay.entries()].map(([day, scores]) => ({
-      day,
-      count: scores.length,
-      avg: averageScore(scores),
-      csatPercent: csatPercent(scores),
-    })),
+    daily,
+    dailyByProject,
     projects: projectRows,
     worstPages,
     recentComments,
