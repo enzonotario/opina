@@ -146,6 +146,7 @@ function copyExport(format: 'csv' | 'json') {
 }
 
 const deletingId = ref<string | null>(null)
+const importOpen = ref(false)
 
 async function removeResponse(row: { id: string, comment: string | null }) {
   const preview = row.comment?.trim()
@@ -242,6 +243,14 @@ const surveyItems = computed(() => [
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
+          <UButton
+            size="sm"
+            color="neutral"
+            variant="outline"
+            label="Import"
+            icon="i-lucide-upload"
+            @click="importOpen = true"
+          />
           <UButton
             size="sm"
             color="neutral"
@@ -563,6 +572,13 @@ const surveyItems = computed(() => [
           />
         </template>
       </USlideover>
+
+      <ResponseImportModal
+        v-model:open="importOpen"
+        :project-id="id"
+        :surveys="surveysData?.surveys || []"
+        @imported="refresh()"
+      />
     </template>
   </UDashboardPanel>
 </template>
