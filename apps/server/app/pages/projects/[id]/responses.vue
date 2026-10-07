@@ -41,8 +41,17 @@ const path = ref(typeof route.query.path === 'string' ? route.query.path : '')
 const surveyFilter = ref<string>(
   typeof route.query.surveyId === 'string' ? route.query.surveyId : 'all',
 )
+/** 0-based page index for the API offset. */
 const page = ref(0)
 const pageSize = 50
+
+/** 1-based page for UPagination. */
+const pageModel = computed({
+  get: () => page.value + 1,
+  set: (value: number) => {
+    page.value = Math.max(0, value - 1)
+  },
+})
 
 const query = computed(() => {
   const params = new URLSearchParams()
@@ -66,9 +75,7 @@ watch([q, hasComment, path, surveyFilter], () => {
 
 const { autoRefresh } = useAutoRefresh(() => refresh())
 
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil((data.value?.total || 0) / pageSize)),
-)
+const totalCount = computed(() => data.value?.total || 0)
 
 const commentHeader = computed(() => {
   const surveys = surveysData.value?.surveys || []
@@ -358,7 +365,10 @@ const surveyItems = computed(() => [
 </script>
 
 <template>
-  <UDashboardPanel :id="`project-responses-${id}`">
+  <UDashboardPanel
+    :id="`project-responses-${id}`"
+    :ui="{ body: 'flex flex-col min-h-0 overflow-hidden' }"
+  >
     <template #header>
       <UDashboardNavbar title="Respondents">
         <template #leading>
@@ -444,15 +454,10 @@ const surveyItems = computed(() => [
     </template>
 
     <template #body>
-      <div class="space-y-3">
-        <p class="text-sm text-muted">
-          {{ data?.total ?? 0 }} responses
-          <span v-if="projectData">· {{ projectData.project.name }}</span>
-        </p>
-
+      <div class="flex flex-col gap-3 min-h-0 h-full">
         <div
           v-if="importJob"
-          class="rounded-xl ring-1 ring-default bg-default p-4 space-y-2"
+          class="rounded-xl ring-1 ring-default bg-default p-4 space-y-2 shrink-0"
         >
           <div class="flex items-center justify-between gap-3 text-sm">
             <div class="min-w-0">
@@ -508,151 +513,145 @@ const surveyItems = computed(() => [
           No responses match these filters.
         </div>
 
-        <div
-          v-else
-          class="overflow-x-auto border border-default rounded-lg bg-default"
-        >
-          <table class="min-w-full text-sm">
-            <thead class="bg-elevated/50 text-left text-xs text-muted">
-              <tr>
-                <th class="px-3 py-2.5 font-medium w-28">
-                  Screenshot
-                </th>
-                <th class="px-3 py-2.5 font-medium min-w-56">
-                  {{ commentHeader }}
-                </th>
-                <th class="px-3 py-2.5 font-medium">
-                  Reaction
-                </th>
-                <th class="px-3 py-2.5 font-medium">
-                  Survey
-                </th>
-                <th class="px-3 py-2.5 font-medium">
-                  Page
-                </th>
-                <th class="px-3 py-2.5 font-medium">
-                  Date
-                </th>
-                <th class="px-3 py-2.5 font-medium">
-                  Device
-                </th>
-                <th class="px-3 py-2.5 font-medium text-right">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody class="divide-y divide-default">
-              <tr
-                v-for="row in data.items"
-                :key="row.id"
-                class="hover:bg-elevated/40 cursor-pointer"
-                :class="{ 'bg-elevated/50': selected?.id === row.id }"
-                @click="selected = row"
-              >
-                <td class="px-3 py-2">
-                  <img
-                    v-if="row.screenshotPath"
-                    :src="`/api/admin/projects/${id}/responses/${row.id}/screenshot`"
-                    alt=""
-                    class="h-14 w-24 object-cover rounded-md border border-default"
-                  >
-                  <div
-                    v-else
-                    class="h-14 w-24 rounded-md border border-dashed border-default bg-elevated/50 flex items-center justify-center text-[10px] text-muted"
-                  >
-                    No shot
-                  </div>
-                </td>
-                <td class="px-3 py-2 max-w-md">
-                  <p class="whitespace-pre-wrap break-words text-highlighted">
-                    {{ row.comment || '—' }}
-                  </p>
-                </td>
-                <td class="px-3 py-2 whitespace-nowrap text-sm text-highlighted">
-                  {{ reaction(row.score, row.surveyId) }}
-                </td>
-                <td class="px-3 py-2">
-                  <div class="min-w-0 max-w-40">
-                    <p class="truncate text-highlighted text-sm">
-                      {{ surveyName(row.surveyId) }}
-                    </p>
-                    <p class="text-[11px] text-muted truncate">
-                      {{ surveyTypeLabel(row.surveyId) }}
-                    </p>
-                  </div>
-                </td>
-                <td class="px-3 py-2">
-                  <span
-                    class="inline-flex items-center gap-1.5 font-mono text-xs text-muted max-w-48 truncate"
-                    :title="`${row.urlHost}${row.urlPath}`"
-                  >
-                    <UIcon
-                      name="i-lucide-globe"
-                      class="size-3.5 shrink-0"
-                    />
-                    {{ row.urlPath }}
-                  </span>
-                </td>
-                <td class="px-3 py-2 whitespace-nowrap text-muted text-xs">
-                  {{ fmt(row.createdAt) }}
-                </td>
-                <td class="px-3 py-2">
-                  <UIcon
-                    :name="deviceIcon(row.device)"
-                    class="size-4 text-muted"
-                    :title="row.device || 'desktop'"
-                  />
-                </td>
-                <td
-                  class="px-3 py-2 text-right"
-                  @click.stop
+        <template v-else>
+          <div class="min-h-0 flex-1 overflow-auto border border-default rounded-lg bg-default max-h-[calc(100dvh-13rem)]">
+            <table class="min-w-full text-sm">
+              <thead class="sticky top-0 z-10 bg-elevated text-left text-xs text-muted border-b border-default">
+                <tr>
+                  <th class="px-3 py-2.5 font-medium w-28">
+                    Screenshot
+                  </th>
+                  <th class="px-3 py-2.5 font-medium min-w-56">
+                    {{ commentHeader }}
+                  </th>
+                  <th class="px-3 py-2.5 font-medium">
+                    Reaction
+                  </th>
+                  <th class="px-3 py-2.5 font-medium">
+                    Survey
+                  </th>
+                  <th class="px-3 py-2.5 font-medium">
+                    Page
+                  </th>
+                  <th class="px-3 py-2.5 font-medium">
+                    Date
+                  </th>
+                  <th class="px-3 py-2.5 font-medium">
+                    Device
+                  </th>
+                  <th class="px-3 py-2.5 font-medium text-right">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-default">
+                <tr
+                  v-for="row in data.items"
+                  :key="row.id"
+                  class="hover:bg-elevated/40 cursor-pointer"
+                  :class="{ 'bg-elevated/50': selected?.id === row.id }"
+                  @click="selected = row"
                 >
-                  <div class="inline-flex items-center gap-1">
-                    <UButton
-                      size="xs"
-                      color="neutral"
-                      variant="soft"
-                      label="View"
-                      @click="selected = row"
+                  <td class="px-3 py-2">
+                    <img
+                      v-if="row.screenshotPath"
+                      :src="`/api/admin/projects/${id}/responses/${row.id}/screenshot`"
+                      alt=""
+                      class="h-14 w-24 object-cover rounded-md border border-default"
+                    >
+                    <div
+                      v-else
+                      class="h-14 w-24 rounded-md border border-dashed border-default bg-elevated/50 flex items-center justify-center text-[10px] text-muted"
+                    >
+                      No shot
+                    </div>
+                  </td>
+                  <td class="px-3 py-2 max-w-md">
+                    <p class="whitespace-pre-wrap break-words text-highlighted">
+                      {{ row.comment || '—' }}
+                    </p>
+                  </td>
+                  <td class="px-3 py-2 whitespace-nowrap text-sm text-highlighted">
+                    {{ reaction(row.score, row.surveyId) }}
+                  </td>
+                  <td class="px-3 py-2">
+                    <div class="min-w-0 max-w-40">
+                      <p class="truncate text-highlighted text-sm">
+                        {{ surveyName(row.surveyId) }}
+                      </p>
+                      <p class="text-[11px] text-muted truncate">
+                        {{ surveyTypeLabel(row.surveyId) }}
+                      </p>
+                    </div>
+                  </td>
+                  <td class="px-3 py-2">
+                    <span
+                      class="inline-flex items-center gap-1.5 font-mono text-xs text-muted max-w-48 truncate"
+                      :title="`${row.urlHost}${row.urlPath}`"
+                    >
+                      <UIcon
+                        name="i-lucide-globe"
+                        class="size-3.5 shrink-0"
+                      />
+                      {{ row.urlPath }}
+                    </span>
+                  </td>
+                  <td class="px-3 py-2 whitespace-nowrap text-muted text-xs">
+                    {{ fmt(row.createdAt) }}
+                  </td>
+                  <td class="px-3 py-2">
+                    <UIcon
+                      :name="deviceIcon(row.device)"
+                      class="size-4 text-muted"
+                      :title="row.device || 'desktop'"
                     />
-                    <UButton
-                      size="xs"
-                      color="error"
-                      variant="ghost"
-                      icon="i-lucide-trash-2"
-                      :loading="deletingId === row.id"
-                      :disabled="!!deletingId"
-                      @click="removeResponse(row)"
-                    />
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+                  </td>
+                  <td
+                    class="px-3 py-2 text-right"
+                    @click.stop
+                  >
+                    <div class="inline-flex items-center gap-1">
+                      <UButton
+                        size="xs"
+                        color="neutral"
+                        variant="soft"
+                        label="View"
+                        @click="selected = row"
+                      />
+                      <UButton
+                        size="xs"
+                        color="error"
+                        variant="ghost"
+                        icon="i-lucide-trash-2"
+                        :loading="deletingId === row.id"
+                        :disabled="!!deletingId"
+                        @click="removeResponse(row)"
+                      />
+                    </div>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
 
-        <div
-          v-if="(data?.total || 0) > pageSize"
-          class="flex items-center justify-between"
-        >
-          <UButton
-            color="neutral"
-            variant="ghost"
-            label="Previous"
-            :disabled="page <= 0"
-            @click="page--"
-          />
-          <span class="text-sm text-muted">
-            Page {{ page + 1 }} / {{ totalPages }}
-          </span>
-          <UButton
-            color="neutral"
-            variant="ghost"
-            label="Next"
-            :disabled="page + 1 >= totalPages"
-            @click="page++"
-          />
-        </div>
+          <div class="flex flex-wrap items-center justify-between gap-3 shrink-0 pt-0.5">
+            <p class="text-sm text-muted">
+              {{ totalCount }} responses
+              <span v-if="projectData">· {{ projectData.project.name }}</span>
+            </p>
+            <UPagination
+              v-if="totalCount > pageSize"
+              v-model:page="pageModel"
+              :total="totalCount"
+              :items-per-page="pageSize"
+              :sibling-count="1"
+              show-edges
+              size="sm"
+              color="neutral"
+              active-color="primary"
+            />
+          </div>
+        </template>
       </div>
 
       <USlideover
