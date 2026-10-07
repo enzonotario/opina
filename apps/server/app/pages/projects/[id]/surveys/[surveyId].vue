@@ -26,6 +26,8 @@ if (error.value) {
 
 const tab = ref<'questions' | 'appearance' | 'targeting' | 'behavior'>('questions')
 const previewStep = ref<'rating' | 'comment' | 'thanks'>('rating')
+const previewDevice = ref<'mobile' | 'tablet' | 'desktop'>('desktop')
+
 const pending = ref(false)
 const formError = ref('')
 
@@ -375,7 +377,7 @@ const tabLinks = computed(() => [[{
     </template>
 
     <template #body>
-      <div class="w-full max-w-5xl mx-auto space-y-4">
+      <div class="w-full max-w-7xl mx-auto space-y-4">
         <UAlert
           v-if="formError"
           color="error"
@@ -383,8 +385,9 @@ const tabLinks = computed(() => [[{
           :title="formError"
         />
 
-        <div class="grid gap-8 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-          <div class="space-y-5 min-w-0 max-w-2xl">
+        <div class="grid gap-8 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:items-start">
+          <div class="space-y-5 min-w-0">
+
             <template v-if="tab === 'questions'">
               <UFormField
                 label="Active"
@@ -950,32 +953,60 @@ const tabLinks = computed(() => [[{
             </template>
           </div>
 
-          <div class="space-y-3 xl:sticky xl:top-4 self-start">
-            <div class="flex items-center justify-between gap-2">
+          <div class="space-y-3 xl:sticky xl:top-4 self-start min-w-0">
+            <div class="flex flex-wrap items-center justify-between gap-2">
               <p class="text-sm font-medium text-highlighted">
                 Preview
               </p>
-              <UButtonGroup size="xs">
-                <UButton
-                  :variant="previewStep === 'rating' ? 'solid' : 'ghost'"
-                  color="neutral"
-                  label="1"
-                  @click="previewStep = 'rating'"
-                />
-                <UButton
-                  :variant="previewStep === 'comment' ? 'solid' : 'ghost'"
-                  color="neutral"
-                  label="2"
-                  :disabled="type !== 'helpful' && !previewFollowUp"
-                  @click="previewStep = 'comment'"
-                />
-                <UButton
-                  :variant="previewStep === 'thanks' ? 'solid' : 'ghost'"
-                  color="neutral"
-                  label="✓"
-                  @click="previewStep = 'thanks'"
-                />
-              </UButtonGroup>
+              <div class="flex flex-wrap items-center gap-2">
+                <UButtonGroup size="xs">
+                  <UButton
+                    :variant="previewDevice === 'mobile' ? 'solid' : 'ghost'"
+                    color="neutral"
+                    icon="i-lucide-smartphone"
+                    :ui="{ leadingIcon: 'size-3.5' }"
+                    aria-label="Mobile preview"
+                    @click="previewDevice = 'mobile'"
+                  />
+                  <UButton
+                    :variant="previewDevice === 'tablet' ? 'solid' : 'ghost'"
+                    color="neutral"
+                    icon="i-lucide-tablet"
+                    :ui="{ leadingIcon: 'size-3.5' }"
+                    aria-label="Tablet preview"
+                    @click="previewDevice = 'tablet'"
+                  />
+                  <UButton
+                    :variant="previewDevice === 'desktop' ? 'solid' : 'ghost'"
+                    color="neutral"
+                    icon="i-lucide-monitor"
+                    :ui="{ leadingIcon: 'size-3.5' }"
+                    aria-label="Desktop preview"
+                    @click="previewDevice = 'desktop'"
+                  />
+                </UButtonGroup>
+                <UButtonGroup size="xs">
+                  <UButton
+                    :variant="previewStep === 'rating' ? 'solid' : 'ghost'"
+                    color="neutral"
+                    label="1"
+                    @click="previewStep = 'rating'"
+                  />
+                  <UButton
+                    :variant="previewStep === 'comment' ? 'solid' : 'ghost'"
+                    color="neutral"
+                    label="2"
+                    :disabled="type !== 'helpful' && !previewFollowUp"
+                    @click="previewStep = 'comment'"
+                  />
+                  <UButton
+                    :variant="previewStep === 'thanks' ? 'solid' : 'ghost'"
+                    color="neutral"
+                    label="✓"
+                    @click="previewStep = 'thanks'"
+                  />
+                </UButtonGroup>
+              </div>
             </div>
             <SurveyPreview
               :question="previewQuestion"
@@ -984,6 +1015,7 @@ const tabLinks = computed(() => [[{
               :appearance="appearance"
               :type="type"
               :step="previewStep"
+              :device="previewDevice"
             />
           </div>
         </div>
