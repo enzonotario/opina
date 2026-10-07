@@ -1,5 +1,5 @@
 import { requireAdminSession } from '../../../../utils/auth'
-import { listResponses } from '../../../../utils/responses'
+import { listResponses, parseScoreList } from '../../../../utils/responses'
 
 export default defineEventHandler(async (event) => {
   await requireAdminSession(event)
@@ -13,6 +13,7 @@ export default defineEventHandler(async (event) => {
     to: q.to != null ? Number(q.to) : undefined,
     scoreMin: q.scoreMin != null ? Number(q.scoreMin) : undefined,
     scoreMax: q.scoreMax != null ? Number(q.scoreMax) : undefined,
+    scores: parseScoreList(q.scores),
     path: q.path ? String(q.path) : undefined,
     hasComment: q.hasComment === 'true' ? true : q.hasComment === 'false' ? false : undefined,
     q: q.q ? String(q.q) : undefined,

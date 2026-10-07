@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNotNull, lte, sql } from 'drizzle-orm'
+import { and, desc, eq, gte, inArray, isNotNull, lte, sql } from 'drizzle-orm'
 import { responses } from '../db/schema'
 import { useDb } from '../db/client'
 import { getProjectOrThrow } from './projects'
@@ -10,11 +10,27 @@ export type ResponseFilters = {
   to?: number
   scoreMin?: number
   scoreMax?: number
+  /** Exact score match for one or many reactions (e.g. CSAT 1+2). */
+  scores?: number[]
   path?: string
   hasComment?: boolean
   q?: string
   limit?: number
   offset?: number
+}
+
+/** Parse `scores=1,2` or `scores=1&scores=2` query values. */
+export function parseScoreList(raw: unknown): number[] | undefined {
+  if (raw == null || raw === '') return undefined
+  const parts = Array.isArray(raw)
+    ? raw.flatMap(v => String(v).split(','))
+    : String(raw).split(',')
+  const scores = [...new Set(
+    parts
+      .map(s => Number(s.trim()))
+      .filter(n => Number.isFinite(n)),
+  )]
+  return scores.length ? scores : undefined
 }
 
 export type ResponseDto = {
@@ -85,8 +101,13 @@ export function listResponses(projectId: string, filters: ResponseFilters = {}) 
   if (filters.surveyId) conditions.push(eq(responses.surveyId, filters.surveyId))
   if (filters.from != null) conditions.push(gte(responses.createdAt, filters.from))
   if (filters.to != null) conditions.push(lte(responses.createdAt, filters.to))
-  if (filters.scoreMin != null) conditions.push(gte(responses.score, filters.scoreMin))
-  if (filters.scoreMax != null) conditions.push(lte(responses.score, filters.scoreMax))
+  if (filters.scores?.length) {
+    conditions.push(inArray(responses.score, filters.scores))
+  }
+  else {
+    if (filters.scoreMin != null) conditions.push(gte(responses.score, filters.scoreMin))
+    if (filters.scoreMax != null) conditions.push(lte(responses.score, filters.scoreMax))
+  }
   if (filters.path) conditions.push(sql`${responses.urlPath} like ${`%${filters.path}%`}`)
   if (filters.hasComment === true) {
     conditions.push(isNotNull(responses.comment))

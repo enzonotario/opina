@@ -1,5 +1,5 @@
 import { requireAdminSession } from '../../../../utils/auth'
-import { exportResponses } from '../../../../utils/responses'
+import { exportResponses, parseScoreList } from '../../../../utils/responses'
 
 export default defineEventHandler(async (event) => {
   await requireAdminSession(event)
@@ -12,7 +12,9 @@ export default defineEventHandler(async (event) => {
     surveyId: q.surveyId ? String(q.surveyId) : undefined,
     from: q.from != null ? Number(q.from) : undefined,
     to: q.to != null ? Number(q.to) : undefined,
-    hasComment: q.hasComment === 'true' ? true : undefined,
+    scores: parseScoreList(q.scores),
+    path: q.path ? String(q.path) : undefined,
+    hasComment: q.hasComment === 'true' ? true : q.hasComment === 'false' ? false : undefined,
     q: q.q ? String(q.q) : undefined,
   })
 

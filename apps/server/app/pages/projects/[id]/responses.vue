@@ -41,6 +41,28 @@ const path = ref(typeof route.query.path === 'string' ? route.query.path : '')
 const surveyFilter = ref<string>(
   typeof route.query.surveyId === 'string' ? route.query.surveyId : 'all',
 )
+
+function scoresFromQuery(raw: unknown): number[] {
+  if (raw == null || raw === '') return []
+  const parts = Array.isArray(raw)
+    ? raw.flatMap(v => String(v).split(','))
+    : String(raw).split(',')
+  return [...new Set(
+    parts
+      .map(s => Number(s.trim()))
+      .filter(n => Number.isFinite(n)),
+  )]
+}
+
+/** Exact reaction scores to include (multi-select). Empty = all. */
+const scoreFilter = ref<number[]>(scoresFromQuery(route.query.scores))
+const scoreFilterModel = computed({
+  get: () => scoreFilter.value,
+  set: (value: number[] | null | undefined) => {
+    scoreFilter.value = Array.isArray(value) ? value : []
+  },
+})
+
 /** 0-based page index for the API offset. */
 const page = ref(0)
 const pageSize = 50
@@ -62,6 +84,7 @@ const query = computed(() => {
   if (hasComment.value === 'yes') params.set('hasComment', 'true')
   if (hasComment.value === 'no') params.set('hasComment', 'false')
   if (surveyFilter.value !== 'all') params.set('surveyId', surveyFilter.value)
+  if (scoreFilter.value.length) params.set('scores', scoreFilter.value.join(','))
   return params.toString()
 })
 
@@ -69,7 +92,7 @@ const { data, status, refresh } = await useFetch(
   () => `/api/admin/projects/${id.value}/responses?${query.value}`,
 )
 
-watch([q, hasComment, path, surveyFilter], () => {
+watch([q, hasComment, path, surveyFilter, scoreFilter], () => {
   page.value = 0
 })
 
@@ -108,8 +131,11 @@ type ResponseMeta = {
   hotjarNumber?: string
   hotjarResponseUrl?: string
   country?: string
+  region?: string
+  city?: string
   browser?: string
   os?: string
+  resolution?: string
 }
 
 const selected = ref<ResponseRow | null>(null)
@@ -189,8 +215,11 @@ watch(
 function exportUrl(format: 'csv' | 'json') {
   const params = new URLSearchParams({ format })
   if (q.value.trim()) params.set('q', q.value.trim())
+  if (path.value.trim()) params.set('path', path.value.trim())
   if (hasComment.value === 'yes') params.set('hasComment', 'true')
+  if (hasComment.value === 'no') params.set('hasComment', 'false')
   if (surveyFilter.value !== 'all') params.set('surveyId', surveyFilter.value)
+  if (scoreFilter.value.length) params.set('scores', scoreFilter.value.join(','))
   return `/api/admin/projects/${id.value}/export?${params}`
 }
 
@@ -362,6 +391,51 @@ const surveyItems = computed(() => [
     value: s.id,
   })),
 ])
+
+const scoreFilterType = computed(() => {
+  if (surveyFilter.value !== 'all') {
+    return surveysById.value.get(surveyFilter.value)?.type || 'csat'
+  }
+  const types = new Set((surveysData.value?.surveys || []).map(s => s.type))
+  if (types.size === 1) return [...types][0]!
+  if (types.has('csat')) return 'csat'
+  if (types.has('helpful')) return 'helpful'
+  if (types.has('thumbs')) return 'thumbs'
+  return 'csat'
+})
+
+const scoreFilterItems = computed(() => {
+  const type = scoreFilterType.value
+  if (type === 'thumbs') {
+    return [
+      { label: '👎 Thumbs down', value: 0 },
+      { label: '👍 Thumbs up', value: 1 },
+    ]
+  }
+  if (type === 'helpful') {
+    const survey = surveyFilter.value !== 'all'
+      ? surveysById.value.get(surveyFilter.value)
+      : undefined
+    const options = survey?.appearance.options?.length === 4
+      ? survey.appearance.options
+      : DEFAULT_HELPFUL_OPTIONS
+    const locale = survey?.appearance.locale || 'es'
+    return options.map(o => ({
+      label: pickI18n(o.label, locale, String(o.value)),
+      value: o.value,
+    }))
+  }
+  return EMOJIS.map((emoji, i) => ({
+    label: `${emoji} ${i + 1}`,
+    value: i + 1,
+  }))
+})
+
+watch(scoreFilterItems, (items) => {
+  const allowed = new Set(items.map(i => i.value))
+  const next = scoreFilter.value.filter(s => allowed.has(s))
+  if (next.length !== scoreFilter.value.length) scoreFilter.value = next
+})
 </script>
 
 <template>
@@ -440,6 +514,17 @@ const surveyItems = computed(() => [
                 { label: 'With comment', value: 'yes' },
                 { label: 'Without comment', value: 'no' },
               ]"
+            />
+            <USelectMenu
+              v-model="scoreFilterModel"
+              :items="scoreFilterItems"
+              value-key="value"
+              multiple
+              clear
+              :search-input="false"
+              placeholder="All reactions"
+              size="sm"
+              class="min-w-40"
             />
           </div>
         </template>
@@ -727,11 +812,19 @@ const surveyItems = computed(() => [
                   {{ selected.id }}
                 </dd>
               </div>
-              <div v-if="responseMeta(selected).country">
+              <div v-if="responseMeta(selected).country || responseMeta(selected).region || responseMeta(selected).city">
                 <dt class="text-xs text-muted">
-                  Country
+                  Location
                 </dt>
-                <dd>{{ responseMeta(selected).country }}</dd>
+                <dd class="text-xs">
+                  {{
+                    [
+                      responseMeta(selected).city,
+                      responseMeta(selected).region,
+                      responseMeta(selected).country,
+                    ].filter(Boolean).join(', ')
+                  }}
+                </dd>
               </div>
               <div v-if="responseMeta(selected).browser || responseMeta(selected).os">
                 <dt class="text-xs text-muted">
@@ -739,6 +832,14 @@ const surveyItems = computed(() => [
                 </dt>
                 <dd class="text-xs">
                   {{ [responseMeta(selected).browser, responseMeta(selected).os].filter(Boolean).join(' · ') }}
+                </dd>
+              </div>
+              <div v-if="responseMeta(selected).resolution">
+                <dt class="text-xs text-muted">
+                  Resolution
+                </dt>
+                <dd class="font-mono text-xs">
+                  {{ responseMeta(selected).resolution }}
                 </dd>
               </div>
             </dl>

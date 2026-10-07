@@ -302,8 +302,11 @@ export async function processImportJob(jobId: string) {
             if (externalId) metadata.externalId = externalId
             if (responseUrl) metadata.externalUrl = responseUrl
             if (record.Country) metadata.country = record.Country
+            if (record.Region) metadata.region = record.Region
+            if (record.City) metadata.city = record.City
             if (record.Browser) metadata.browser = record.Browser
             if (record.OS) metadata.os = record.OS
+            if (record.Resolution) metadata.resolution = record.Resolution
             // Keep Hotjar-specific keys for older UI / debugging.
             if (hotjarNumber) metadata.hotjarNumber = hotjarNumber
             if (responseUrl) metadata.hotjarResponseUrl = responseUrl

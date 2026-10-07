@@ -16,6 +16,7 @@ import {
 import { consumeRateLimit } from '../../../utils/rate-limit'
 import { clientIp } from '../../../utils/request-ip'
 import { parseJsonBody } from '../../../utils/json-body'
+import { buildResponseMetadata } from '../../../utils/response-metadata'
 import { isVisitorDailyCapReached } from '../../../utils/visitor-limit'
 
 const MIN_SHOWN_MS = 1000
@@ -93,7 +94,8 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  const metadata = JSON.stringify(body.metadata || {})
+  const metadataObj = buildResponseMetadata(event, body.metadata)
+  const metadata = JSON.stringify(metadataObj)
   if (Buffer.byteLength(metadata, 'utf8') > 2048) {
     throw createError({ statusCode: 400, statusMessage: 'metadata too large' })
   }

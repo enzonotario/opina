@@ -462,6 +462,18 @@ function helpfulHeadHtml(title: string, a: Appearance, id = 'opina-helpful-q') {
   return `<div class="inline-head">${logo}${q}</div>`
 }
 
+function screenResolution(): string | undefined {
+  try {
+    const w = window.screen?.width
+    const h = window.screen?.height
+    if (!w || !h) return undefined
+    return `${Math.round(w)}x${Math.round(h)}`
+  }
+  catch {
+    return undefined
+  }
+}
+
 async function submitResponse(
   survey: Survey,
   score: number,
@@ -470,6 +482,7 @@ async function submitResponse(
   shownAt: number,
 ) {
   if (Date.now() - shownAt < 800) return false
+  const resolution = screenResolution()
   const body = {
     key: state.key,
     surveyId: survey.id,
@@ -479,7 +492,10 @@ async function submitResponse(
     host: location.host,
     locale: state.locale,
     visitorId: state.visitorId,
-    metadata: state.meta,
+    metadata: {
+      ...state.meta,
+      ...(resolution ? { resolution } : {}),
+    },
     device: device(),
     shownAt,
     hp,

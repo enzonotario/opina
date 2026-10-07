@@ -12,12 +12,18 @@ const HOTJAR_META = new Set([
   'User',
   'Date Submitted',
   'Country',
+  'Region',
+  'City',
   'Source URL',
   'Device',
   'Browser',
   'OS',
+  'Resolution',
   'Hotjar User ID',
   'Response URL',
+  'Name',
+  'Email',
+  'Sentiment',
 ])
 
 /** Minimal RFC4180 CSV parser (quoted fields, commas, newlines). */
