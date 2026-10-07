@@ -89,9 +89,56 @@ type ResponseRow = {
   createdAt: number
   screenshotPath: string | null
   surveyId: string
+  metadata?: Record<string, unknown>
+}
+
+type ResponseMeta = {
+  imported?: boolean
+  source?: string
+  externalId?: string
+  externalUrl?: string
+  importKey?: string
+  hotjarNumber?: string
+  hotjarResponseUrl?: string
+  country?: string
+  browser?: string
+  os?: string
 }
 
 const selected = ref<ResponseRow | null>(null)
+
+function responseMeta(row: ResponseRow | null | undefined): ResponseMeta {
+  const raw = row?.metadata
+  if (!raw || typeof raw !== 'object') return {}
+  return raw as ResponseMeta
+}
+
+function isImported(row: ResponseRow | null | undefined) {
+  const m = responseMeta(row)
+  return m.imported === true
+    || m.source === 'hotjar'
+    || m.source === 'generic'
+    || !!m.importKey
+}
+
+function externalIdOf(row: ResponseRow | null | undefined) {
+  const m = responseMeta(row)
+  const id = m.externalId || m.hotjarNumber
+  return typeof id === 'string' && id ? id : null
+}
+
+function externalUrlOf(row: ResponseRow | null | undefined) {
+  const m = responseMeta(row)
+  const url = m.externalUrl || m.hotjarResponseUrl
+  return typeof url === 'string' && url ? url : null
+}
+
+function importSourceLabel(row: ResponseRow | null | undefined) {
+  const source = responseMeta(row).source
+  if (source === 'hotjar') return 'Hotjar'
+  if (source === 'generic') return 'CSV'
+  return 'Import'
+}
 
 async function openResponseById(responseId: string) {
   const fromList = (data.value?.items as ResponseRow[] | undefined)?.find(r => r.id === responseId)
@@ -147,6 +194,81 @@ function copyExport(format: 'csv' | 'json') {
 
 const deletingId = ref<string | null>(null)
 const importOpen = ref(false)
+
+type ImportJob = {
+  id: string
+  status: 'queued' | 'running' | 'done' | 'error'
+  total: number
+  processed: number
+  imported: number
+  skipped: number
+  errors: Array<{ row: number, message: string }>
+  errorMessage: string | null
+}
+
+const importJob = ref<ImportJob | null>(null)
+let importPollTimer: ReturnType<typeof setInterval> | null = null
+
+const importProgress = computed(() => {
+  if (!importJob.value?.total) return 0
+  return Math.min(100, Math.round((importJob.value.processed / importJob.value.total) * 100))
+})
+
+function stopImportPoll() {
+  if (importPollTimer) {
+    clearInterval(importPollTimer)
+    importPollTimer = null
+  }
+}
+
+async function pollImportJob(jobId: string) {
+  try {
+    const res = await $fetch<{ job: ImportJob }>(
+      `/api/admin/projects/${id.value}/import/${jobId}`,
+    )
+    importJob.value = res.job
+    if (res.job.status === 'done') {
+      stopImportPoll()
+      toast.add({
+        title: `Imported ${res.job.imported} responses`,
+        description: res.job.skipped
+          ? `${res.job.skipped} duplicates skipped`
+          : undefined,
+        color: 'success',
+      })
+      await refresh()
+      // Clear banner after a moment
+      setTimeout(() => {
+        if (importJob.value?.id === jobId && importJob.value.status === 'done') {
+          importJob.value = null
+        }
+      }, 4000)
+    }
+    else if (res.job.status === 'error') {
+      stopImportPoll()
+      toast.add({
+        title: res.job.errorMessage || 'Import failed',
+        color: 'error',
+      })
+    }
+  }
+  catch {
+    /* keep polling */
+  }
+}
+
+function onImportStarted(job: ImportJob) {
+  importOpen.value = false
+  importJob.value = job
+  stopImportPoll()
+  void pollImportJob(job.id)
+  importPollTimer = setInterval(() => {
+    void pollImportJob(job.id)
+  }, 600)
+}
+
+onBeforeUnmount(() => stopImportPoll())
+
 
 async function removeResponse(row: { id: string, comment: string | null }) {
   const preview = row.comment?.trim()
@@ -243,14 +365,20 @@ const surveyItems = computed(() => [
           <UDashboardSidebarCollapse />
         </template>
         <template #right>
-          <UButton
-            size="sm"
-            color="neutral"
-            variant="outline"
-            label="Import"
-            icon="i-lucide-upload"
-            @click="importOpen = true"
-          />
+          <ResponseImportModal
+            v-model:open="importOpen"
+            :project-id="id"
+            :surveys="surveysData?.surveys || []"
+            @started="onImportStarted"
+          >
+            <UButton
+              size="sm"
+              color="neutral"
+              variant="outline"
+              label="Import"
+              icon="i-lucide-upload"
+            />
+          </ResponseImportModal>
           <UButton
             size="sm"
             color="neutral"
@@ -321,6 +449,50 @@ const surveyItems = computed(() => [
           {{ data?.total ?? 0 }} responses
           <span v-if="projectData">· {{ projectData.project.name }}</span>
         </p>
+
+        <div
+          v-if="importJob"
+          class="rounded-xl ring-1 ring-default bg-default p-4 space-y-2"
+        >
+          <div class="flex items-center justify-between gap-3 text-sm">
+            <div class="min-w-0">
+              <p class="font-medium text-highlighted">
+                {{
+                  importJob.status === 'done'
+                    ? 'Import complete'
+                    : importJob.status === 'error'
+                      ? 'Import failed'
+                      : 'Importing CSV…'
+                }}
+              </p>
+              <p class="text-xs text-muted mt-0.5">
+                <template v-if="importJob.status === 'error'">
+                  {{ importJob.errorMessage || 'Something went wrong' }}
+                </template>
+                <template v-else>
+                  {{ importJob.imported }} imported
+                  · {{ importJob.skipped }} skipped
+                  · {{ importJob.processed }} / {{ importJob.total }} rows
+                </template>
+              </p>
+            </div>
+            <UButton
+              v-if="importJob.status === 'done' || importJob.status === 'error'"
+              size="xs"
+              color="neutral"
+              variant="ghost"
+              label="Dismiss"
+              @click="importJob = null"
+            />
+          </div>
+          <div class="h-2 rounded-full bg-elevated overflow-hidden">
+            <div
+              class="h-full rounded-full transition-all duration-300"
+              :class="importJob.status === 'error' ? 'bg-error' : 'bg-primary'"
+              :style="{ width: `${importJob.status === 'done' ? 100 : importProgress}%` }"
+            />
+          </div>
+        </div>
 
         <div
           v-if="status === 'pending' && !data"
@@ -556,7 +728,58 @@ const surveyItems = computed(() => [
                   {{ selected.id }}
                 </dd>
               </div>
+              <div v-if="responseMeta(selected).country">
+                <dt class="text-xs text-muted">
+                  Country
+                </dt>
+                <dd>{{ responseMeta(selected).country }}</dd>
+              </div>
+              <div v-if="responseMeta(selected).browser || responseMeta(selected).os">
+                <dt class="text-xs text-muted">
+                  Browser / OS
+                </dt>
+                <dd class="text-xs">
+                  {{ [responseMeta(selected).browser, responseMeta(selected).os].filter(Boolean).join(' · ') }}
+                </dd>
+              </div>
             </dl>
+
+            <div
+              v-if="isImported(selected)"
+              class="rounded-lg border border-default bg-elevated/50 px-3 py-2.5 space-y-2"
+            >
+              <div class="flex flex-wrap items-center gap-2">
+                <UBadge
+                  color="neutral"
+                  variant="subtle"
+                  size="sm"
+                  :label="`Imported · ${importSourceLabel(selected)}`"
+                />
+              </div>
+              <dl class="grid grid-cols-1 gap-2 text-sm">
+                <div v-if="externalIdOf(selected)">
+                  <dt class="text-xs text-muted">
+                    External id
+                  </dt>
+                  <dd class="font-mono text-xs">
+                    {{ externalIdOf(selected) }}
+                  </dd>
+                </div>
+                <div v-if="externalUrlOf(selected)">
+                  <dt class="text-xs text-muted">
+                    External URL
+                  </dt>
+                  <dd>
+                    <a
+                      :href="externalUrlOf(selected)!"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      class="text-xs text-primary break-all hover:underline"
+                    >{{ externalUrlOf(selected) }}</a>
+                  </dd>
+                </div>
+              </dl>
+            </div>
           </div>
         </template>
         <template #footer>
@@ -573,12 +796,7 @@ const surveyItems = computed(() => [
         </template>
       </USlideover>
 
-      <ResponseImportModal
-        v-model:open="importOpen"
-        :project-id="id"
-        :surveys="surveysData?.surveys || []"
-        @imported="refresh()"
-      />
     </template>
   </UDashboardPanel>
 </template>
+

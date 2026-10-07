@@ -50,6 +50,17 @@ const { autoRefresh } = useAutoRefresh(() => refreshStats())
 
 const chartGroup = useLocalStorage<'all' | 'projects'>('opina:chart-group', 'all')
 
+const chartGroupItems = [
+  { label: 'All', value: 'all' },
+  { label: 'By project', value: 'projects' },
+]
+
+// Mount tabs after client localStorage is ready (avoids SSR default vs stored value mismatch).
+const chartGroupReady = ref(false)
+onMounted(() => {
+  chartGroupReady.value = true
+})
+
 const stats = computed(() => statsData.value?.stats)
 
 const chartSeries = computed(() => {
@@ -250,23 +261,18 @@ function relativeTime(ms: number) {
                     : 'All projects · 30 days' }}
                 </p>
               </div>
-              <UButtonGroup
-                v-if="(stats.dailyByProject?.length || 0) > 1"
+              <UTabs
+                v-if="chartGroupReady && (stats.dailyByProject?.length || 0) > 1"
+                v-model="chartGroup"
+                :default-value="chartGroup"
+                :items="chartGroupItems"
+                :content="false"
                 size="xs"
-              >
-                <UButton
-                  :variant="chartGroup === 'all' ? 'solid' : 'ghost'"
-                  color="neutral"
-                  label="All"
-                  @click="chartGroup = 'all'"
-                />
-                <UButton
-                  :variant="chartGroup === 'projects' ? 'solid' : 'ghost'"
-                  color="neutral"
-                  label="By project"
-                  @click="chartGroup = 'projects'"
-                />
-              </UButtonGroup>
+                color="neutral"
+                variant="link"
+                class="w-auto shrink-0"
+                :ui="{ root: 'w-auto', list: 'w-auto' }"
+              />
             </div>
             <DailyChart
               :daily="stats.daily"

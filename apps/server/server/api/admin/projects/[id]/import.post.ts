@@ -1,5 +1,5 @@
 import { requireAdminSession } from '../../../../utils/auth'
-import { importCsvResponses } from '../../../../utils/import-responses'
+import { enqueueImportJob } from '../../../../utils/import-responses'
 import type { CsvImportMapping } from '../../../../../shared/csv-import'
 
 type Body = {
@@ -36,5 +36,7 @@ export default defineEventHandler(async (event) => {
     visitor: String(body.mapping?.visitor || ''),
   }
 
-  return importCsvResponses(id, { csv, surveyId, mapping })
+  const job = enqueueImportJob(id, { csv, surveyId, mapping })
+  return { job }
 })
+

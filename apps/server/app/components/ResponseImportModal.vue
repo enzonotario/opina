@@ -7,6 +7,18 @@ import {
   type CsvImportMapping,
 } from '#shared/csv-import'
 
+export type ImportJob = {
+  id: string
+  status: 'queued' | 'running' | 'done' | 'error'
+  total: number
+  processed: number
+  imported: number
+  skipped: number
+  errors: Array<{ row: number, message: string }>
+  errorMessage: string | null
+  detected: string | null
+}
+
 const props = defineProps<{
   projectId: string
   surveys: SurveyDto[]
@@ -15,11 +27,11 @@ const props = defineProps<{
 const open = defineModel<boolean>('open', { default: false })
 
 const emit = defineEmits<{
-  imported: []
+  started: [job: ImportJob]
 }>()
 
 const toast = useToast()
-const step = ref<'upload' | 'map' | 'done'>('upload')
+const step = ref<'upload' | 'map'>('upload')
 const pending = ref(false)
 const csvText = ref('')
 const fileName = ref('')
@@ -36,12 +48,6 @@ const mapping = ref<CsvImportMapping>({
 })
 const surveyId = ref('')
 const hotjar = ref(false)
-const result = ref<{
-  imported: number
-  skipped: number
-  errors: Array<{ row: number, message: string }>
-  detected: string
-} | null>(null)
 
 const headerItems = computed(() => [
   { label: '— skip —', value: '' },
@@ -56,11 +62,6 @@ const surveyItems = computed(() =>
 )
 
 const csatSurveys = computed(() => props.surveys.filter(s => s.type === 'csat'))
-
-watch(open, (v) => {
-  if (!v) return
-  reset()
-})
 
 function reset() {
   step.value = 'upload'
@@ -80,8 +81,11 @@ function reset() {
   }
   surveyId.value = csatSurveys.value[0]?.id || props.surveys[0]?.id || ''
   hotjar.value = false
-  result.value = null
 }
+
+watch(open, (v) => {
+  if (v) reset()
+})
 
 async function onFile(event: Event) {
   const input = event.target as HTMLInputElement
@@ -109,7 +113,29 @@ async function onFile(event: Event) {
   step.value = 'map'
 }
 
-async function runImport() {
+function scrubImportDialog() {
+  // Nuxt UI / Reka can leave a data-state=closed dialog mounted and fully visible
+  // after programmatic close. Remove only this import dialog from the portal.
+  for (const el of document.querySelectorAll('[role="dialog"]')) {
+    if (!el.textContent?.includes('Import CSV')) continue
+    const portal = el.parentElement
+    el.remove()
+    if (portal && !portal.querySelector('[role="dialog"]')) {
+      portal.querySelectorAll('[data-slot="overlay"]').forEach(o => o.remove())
+      if (!portal.childElementCount) portal.remove()
+    }
+  }
+}
+
+function dismiss(close?: () => void) {
+  close?.()
+  open.value = false
+  nextTick(() => {
+    requestAnimationFrame(() => scrubImportDialog())
+  })
+}
+
+async function runImport(close: () => void) {
   if (!mapping.value.score) {
     toast.add({ title: 'Pick a score column', color: 'error' })
     return
@@ -118,30 +144,36 @@ async function runImport() {
     toast.add({ title: 'Pick a survey', color: 'error' })
     return
   }
+
   pending.value = true
   try {
-    result.value = await $fetch(`/api/admin/projects/${props.projectId}/import`, {
-      method: 'POST',
-      body: {
-        csv: csvText.value,
-        surveyId: surveyId.value,
-        mapping: mapping.value,
+    const res = await $fetch<{ job: ImportJob }>(
+      `/api/admin/projects/${props.projectId}/import`,
+      {
+        method: 'POST',
+        body: {
+          csv: csvText.value,
+          surveyId: surveyId.value,
+          mapping: mapping.value,
+        },
       },
-    })
-    step.value = 'done'
+    )
+    const created = res?.job
+    if (!created?.id) {
+      throw new Error('Import job was not created')
+    }
+    dismiss(close)
+    emit('started', created)
     toast.add({
-      title: `Imported ${result.value.imported} responses`,
-      description: result.value.skipped
-        ? `${result.value.skipped} duplicates skipped`
-        : undefined,
+      title: 'Import started',
+      description: `Processing ${created.total} rows in the background`,
       color: 'success',
     })
-    emit('imported')
   }
   catch (e: unknown) {
-    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
+    const err = e as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
     toast.add({
-      title: err.data?.statusMessage || err.statusMessage || 'Import failed',
+      title: err.data?.statusMessage || err.statusMessage || err.message || 'Import failed',
       color: 'error',
     })
   }
@@ -152,19 +184,32 @@ async function runImport() {
 </script>
 
 <template>
+  <!-- Default slot = trigger (Nuxt UI Modal Presence expects a trigger). -->
   <UModal
     v-model:open="open"
     title="Import CSV"
     description="Map a Hotjar (or similar) survey export into this project"
-    :ui="{ content: 'sm:max-w-2xl' }"
+    :transition="false"
+    :unmount-on-hide="true"
+    :ui="{ content: 'sm:max-w-2xl', footer: 'justify-end' }"
+    @after:leave="scrubImportDialog"
   >
+    <slot>
+      <UButton
+        color="neutral"
+        variant="outline"
+        icon="i-lucide-upload"
+        label="Import"
+      />
+    </slot>
+
     <template #body>
       <div
         v-if="step === 'upload'"
         class="space-y-4"
       >
         <p class="text-sm text-muted">
-          Export responses from Hotjar as CSV, then upload the file. We’ll auto-map common columns.
+          Export responses from Hotjar as CSV, then upload the file. Import runs in the background.
         </p>
         <label
           class="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-default bg-elevated/40 px-6 py-10 cursor-pointer hover:bg-elevated/70 transition-colors"
@@ -185,7 +230,7 @@ async function runImport() {
       </div>
 
       <div
-        v-else-if="step === 'map'"
+        v-else
         class="space-y-5"
       >
         <div class="flex flex-wrap items-center gap-2 text-sm">
@@ -305,74 +350,31 @@ async function runImport() {
           </table>
         </div>
       </div>
-
-      <div
-        v-else
-        class="space-y-3"
-      >
-        <div class="grid grid-cols-3 gap-3">
-          <div class="rounded-lg bg-elevated/60 ring-1 ring-default p-3 text-center">
-            <p class="text-2xl font-semibold tabular-nums text-highlighted">
-              {{ result?.imported ?? 0 }}
-            </p>
-            <p class="text-xs text-muted mt-1">
-              Imported
-            </p>
-          </div>
-          <div class="rounded-lg bg-elevated/60 ring-1 ring-default p-3 text-center">
-            <p class="text-2xl font-semibold tabular-nums text-highlighted">
-              {{ result?.skipped ?? 0 }}
-            </p>
-            <p class="text-xs text-muted mt-1">
-              Skipped (dupes)
-            </p>
-          </div>
-          <div class="rounded-lg bg-elevated/60 ring-1 ring-default p-3 text-center">
-            <p class="text-2xl font-semibold tabular-nums text-highlighted">
-              {{ result?.errors.length ?? 0 }}
-            </p>
-            <p class="text-xs text-muted mt-1">
-              Row errors
-            </p>
-          </div>
-        </div>
-        <ul
-          v-if="result?.errors.length"
-          class="text-xs text-muted space-y-1 max-h-40 overflow-y-auto"
-        >
-          <li
-            v-for="(err, i) in result.errors"
-            :key="i"
-          >
-            Row {{ err.row }}: {{ err.message }}
-          </li>
-        </ul>
-      </div>
     </template>
 
-    <template #footer>
-      <div class="flex justify-end gap-2">
-        <UButton
-          v-if="step === 'map'"
-          color="neutral"
-          variant="ghost"
-          label="Back"
-          @click="step = 'upload'"
-        />
-        <UButton
-          color="neutral"
-          variant="ghost"
-          :label="step === 'done' ? 'Close' : 'Cancel'"
-          @click="open = false"
-        />
-        <UButton
-          v-if="step === 'map'"
-          label="Import"
-          icon="i-lucide-upload"
-          :loading="pending"
-          @click="runImport"
-        />
-      </div>
+    <template #footer="{ close }">
+      <UButton
+        v-if="step === 'map'"
+        color="neutral"
+        variant="ghost"
+        label="Back"
+        :disabled="pending"
+        @click="step = 'upload'"
+      />
+      <UButton
+        color="neutral"
+        variant="outline"
+        label="Cancel"
+        :disabled="pending"
+        @click="dismiss(close)"
+      />
+      <UButton
+        v-if="step === 'map'"
+        label="Start import"
+        icon="i-lucide-upload"
+        :loading="pending"
+        @click="runImport(close)"
+      />
     </template>
   </UModal>
 </template>

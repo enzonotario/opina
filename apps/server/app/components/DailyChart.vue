@@ -81,40 +81,51 @@ function barHeight(count: number) {
     v-else
     class="space-y-3"
   >
-    <div class="flex items-end gap-px sm:gap-1 h-40 px-0.5">
-      <div
-        v-for="point in points"
-        :key="point.day"
-        class="flex-1 min-w-0 h-full flex flex-col justify-end items-center"
-        :title="titleFor(point.day)"
-      >
-        <span
-          v-if="dayTotal(point.day)"
-          class="text-[10px] text-muted mb-1 tabular-nums"
-        >{{ dayTotal(point.day) }}</span>
-
+    <div class="flex flex-col h-40 px-0.5">
+      <!-- Day totals above the plot so % bar heights share one baseline -->
+      <div class="flex gap-px sm:gap-1 h-4 shrink-0">
         <div
-          v-if="grouped"
-          class="w-full max-w-12 h-[calc(100%-1.25rem)] flex items-end justify-center gap-0.5"
+          v-for="point in points"
+          :key="`label-${point.day}`"
+          class="flex-1 min-w-0 flex justify-center items-end"
+        >
+          <span
+            v-if="dayTotal(point.day)"
+            class="text-[10px] leading-none text-muted tabular-nums"
+          >{{ dayTotal(point.day) }}</span>
+        </div>
+      </div>
+
+      <div class="flex-1 min-h-0 overflow-hidden flex items-end gap-px sm:gap-1">
+        <div
+          v-for="point in points"
+          :key="point.day"
+          class="flex-1 min-w-0 h-full flex items-end justify-center"
+          :title="titleFor(point.day)"
         >
           <div
-            v-for="s in series"
-            :key="s.id"
-            class="flex-1 min-w-[3px] max-w-3.5 rounded-t-sm"
-            :class="countFor(s, point.day) ? '' : 'bg-elevated/80'"
-            :style="{
-              backgroundColor: countFor(s, point.day) ? s.color : undefined,
-              height: barHeight(countFor(s, point.day)),
-            }"
+            v-if="grouped"
+            class="w-full max-w-12 h-full flex items-end justify-center gap-0.5"
+          >
+            <div
+              v-for="s in series"
+              :key="s.id"
+              class="flex-1 min-w-[3px] max-w-3.5 self-end rounded-t-sm"
+              :class="countFor(s, point.day) ? '' : 'bg-elevated/80'"
+              :style="{
+                backgroundColor: countFor(s, point.day) ? s.color : undefined,
+                height: barHeight(countFor(s, point.day)),
+              }"
+            />
+          </div>
+
+          <div
+            v-else
+            class="w-full max-w-8 self-end rounded-t-sm transition-colors"
+            :class="point.count ? 'bg-primary' : 'bg-elevated'"
+            :style="{ height: barHeight(point.count) }"
           />
         </div>
-
-        <div
-          v-else
-          class="w-full max-w-8 rounded-t-sm transition-colors"
-          :class="point.count ? 'bg-primary' : 'bg-elevated'"
-          :style="{ height: barHeight(point.count) }"
-        />
       </div>
     </div>
     <div class="flex justify-between text-[11px] text-muted">

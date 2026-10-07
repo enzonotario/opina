@@ -75,3 +75,28 @@ export const settings = sqliteTable('settings', {
   value: text('value').notNull(),
   updatedAt: integer('updated_at').notNull(),
 })
+
+export const importJobs = sqliteTable(
+  'import_jobs',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    surveyId: text('survey_id').notNull(),
+    status: text('status').notNull(),
+    total: integer('total').notNull().default(0),
+    processed: integer('processed').notNull().default(0),
+    imported: integer('imported').notNull().default(0),
+    skipped: integer('skipped').notNull().default(0),
+    errors: text('errors').notNull().default('[]'),
+    errorMessage: text('error_message'),
+    detected: text('detected'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  table => [
+    index('import_jobs_project_created_idx').on(table.projectId, table.createdAt),
+  ],
+)
+

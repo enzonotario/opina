@@ -29,6 +29,13 @@
       "when": 1791050000000,
       "tag": "0003_visitor_index",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791320000000,
+      "tag": "0004_import_jobs",
+      "breakpoints": true
     }
   ]
 }
