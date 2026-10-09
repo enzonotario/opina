@@ -1,4 +1,12 @@
 <script setup lang="ts">
+import { barY, colorLegend, colorLegendItems, defineChart } from '@tanstack/charts'
+import { group } from '@tanstack/charts/group'
+import { scaleBand } from '@tanstack/charts/scales/band'
+import { scaleLinear } from '@tanstack/charts/scales/linear'
+import { scaleOrdinal } from '@tanstack/charts/scales/ordinal'
+import { tooltip } from '@tanstack/charts/tooltip'
+import { Chart } from '@tanstack/charts/vue'
+
 type DailyPoint = { day: string, count: number, csatPercent: number | null }
 
 type Series = {
@@ -8,22 +16,19 @@ type Series = {
   daily: DailyPoint[]
 }
 
+type Row = {
+  day: string
+  count: number
+  series: string
+  csatPercent: number | null
+}
+
 const props = defineProps<{
   daily: DailyPoint[]
   series?: Series[]
 }>()
 
 const grouped = computed(() => (props.series?.length || 0) > 1)
-
-const maxCount = computed(() => {
-  if (!grouped.value) {
-    return Math.max(1, ...props.daily.map(d => d.count))
-  }
-  return Math.max(
-    1,
-    ...(props.series || []).flatMap(s => s.daily.map(p => p.count)),
-  )
-})
 
 const total = computed(() => props.daily.reduce((n, d) => n + d.count, 0))
 
@@ -33,37 +38,118 @@ const points = computed(() => {
   return sparse ? data.slice(-14) : data
 })
 
-function countFor(series: Series, day: string) {
-  return series.daily.find(p => p.day === day)?.count || 0
-}
-
-function dayTotal(day: string) {
+const rows = computed<Row[]>(() => {
   if (!grouped.value) {
-    return props.daily.find(p => p.day === day)?.count || 0
+    return points.value.map(point => ({
+      day: point.day,
+      count: point.count,
+      series: 'Responses',
+      csatPercent: point.csatPercent,
+    }))
   }
-  return (props.series || []).reduce((sum, s) => sum + countFor(s, day), 0)
+  return (props.series || []).flatMap(series =>
+    points.value.map(point => {
+      const match = series.daily.find(p => p.day === point.day)
+      return {
+        day: point.day,
+        count: match?.count || 0,
+        series: series.name,
+        csatPercent: match?.csatPercent ?? null,
+      }
+    }),
+  )
+})
+
+const maxCount = computed(() => Math.max(1, ...rows.value.map(row => row.count)))
+
+function dayLabel(day: string) {
+  const date = new Date(`${day}T12:00:00`)
+  if (Number.isNaN(date.getTime())) return day
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
-function titleFor(day: string) {
-  if (!grouped.value) {
-    const point = props.daily.find(p => p.day === day)
-    return `${day}: ${point?.count || 0} responses${point?.csatPercent != null ? `, CSAT ${point.csatPercent}%` : ''}`
-  }
-  const parts = (props.series || [])
-    .filter(s => countFor(s, day) > 0)
-    .map(s => `${s.name}: ${countFor(s, day)}`)
-  return `${day}: ${dayTotal(day)} total${parts.length ? ` · ${parts.join(' · ')}` : ''}`
+function tip(row: Row) {
+  const csat = row.csatPercent != null ? ` · CSAT ${row.csatPercent}%` : ''
+  return `${row.count}${csat}`
 }
 
-function label(day: string) {
-  const d = new Date(`${day}T12:00:00`)
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-}
+const definition = computed(() => {
+  const data = rows.value
+  const series = props.series || []
+  const mark = grouped.value
+    ? barY(data, {
+        x: 'day',
+        y: 'count',
+        z: 'series',
+        color: 'series',
+        layout: group({ padding: 0.15 }),
+        maxThickness: 14,
+        radius: { end: 2 },
+      })
+    : barY(data, {
+        x: 'day',
+        y: 'count',
+        fill: 'var(--ui-primary)',
+        maxThickness: 28,
+        radius: { end: 2 },
+      })
 
-function barHeight(count: number) {
-  if (!count) return '2px'
-  return `${Math.max(8, (count / maxCount.value) * 100)}%`
-}
+  return defineChart({
+    marks: [mark],
+    scales: {
+      x: {
+        scale: () => scaleBand<string>().padding(grouped.value ? 0.28 : 0.35),
+        axis: {
+          line: false,
+          ticks: {
+            line: false,
+            format: (value: string) => dayLabel(value),
+          },
+          tickLabels: {
+            fontSize: 11,
+            thin: { priority: 'ends', minGap: 56 },
+          },
+        },
+      },
+      y: {
+        scale: scaleLinear().domain([0, maxCount.value]),
+        grid: true,
+        axis: {
+          line: false,
+          ticks: {
+            count: 4,
+            line: false,
+            format: (value: number) => String(Math.round(value)),
+          },
+          tickLabels: { fontSize: 11 },
+        },
+      },
+    },
+    ...(grouped.value
+      ? {
+          color: {
+            scale: scaleOrdinal(
+              series.map(item => item.name),
+              series.map(item => item.color),
+            ),
+            legend: colorLegend({
+              placement: 'bottom',
+              items: colorLegendItems({ justify: 'start', gap: 12 }),
+            }),
+          },
+        }
+      : {}),
+  }, {
+    tooltip: {
+      use: tooltip,
+      format: point => tip(point.datum as Row),
+      formatGroup: (focused) => {
+        const day = String(focused[0]?.xValue ?? '')
+        return dayLabel(day)
+      },
+    },
+  })
+})
 </script>
 
 <template>
@@ -77,76 +163,12 @@ function barHeight(count: number) {
     />
     <span>No responses in this period</span>
   </div>
-  <div
+  <Chart
     v-else
-    class="space-y-3"
-  >
-    <div class="flex flex-col h-40 px-0.5">
-      <!-- Day totals above the plot so % bar heights share one baseline -->
-      <div class="flex gap-px sm:gap-1 h-4 shrink-0">
-        <div
-          v-for="point in points"
-          :key="`label-${point.day}`"
-          class="flex-1 min-w-0 flex justify-center items-end"
-        >
-          <span
-            v-if="dayTotal(point.day)"
-            class="text-[10px] leading-none text-muted tabular-nums"
-          >{{ dayTotal(point.day) }}</span>
-        </div>
-      </div>
-
-      <div class="flex-1 min-h-0 overflow-hidden flex items-end gap-px sm:gap-1">
-        <div
-          v-for="point in points"
-          :key="point.day"
-          class="flex-1 min-w-0 h-full flex items-end justify-center"
-          :title="titleFor(point.day)"
-        >
-          <div
-            v-if="grouped"
-            class="w-full max-w-12 h-full flex items-end justify-center gap-0.5"
-          >
-            <div
-              v-for="s in series"
-              :key="s.id"
-              class="flex-1 min-w-[3px] max-w-3.5 self-end rounded-t-sm"
-              :class="countFor(s, point.day) ? '' : 'bg-elevated/80'"
-              :style="{
-                backgroundColor: countFor(s, point.day) ? s.color : undefined,
-                height: barHeight(countFor(s, point.day)),
-              }"
-            />
-          </div>
-
-          <div
-            v-else
-            class="w-full max-w-8 self-end rounded-t-sm transition-colors"
-            :class="point.count ? 'bg-primary' : 'bg-elevated'"
-            :style="{ height: barHeight(point.count) }"
-          />
-        </div>
-      </div>
-    </div>
-    <div class="flex justify-between text-[11px] text-muted">
-      <span>{{ label(points[0]!.day) }}</span>
-      <span>{{ label(points[points.length - 1]!.day) }}</span>
-    </div>
-    <div
-      v-if="grouped"
-      class="flex flex-wrap gap-x-3 gap-y-1.5 pt-0.5"
-    >
-      <span
-        v-for="s in series"
-        :key="s.id"
-        class="inline-flex items-center gap-1.5 text-[11px] text-muted"
-      >
-        <span
-          class="size-2.5 rounded-sm shrink-0 ring-1 ring-black/10 dark:ring-white/15"
-          :style="{ backgroundColor: s.color }"
-        />
-        <span class="truncate max-w-36">{{ s.name }}</span>
-      </span>
-    </div>
-  </div>
+    :definition="definition"
+    aria-label="Responses per day"
+    :height="176"
+    :initial-width="640"
+    class="w-full text-muted"
+  />
 </template>
