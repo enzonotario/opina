@@ -1,5 +1,5 @@
-import { requireAdminSession } from '../../../../../../utils/auth'
-import { deleteWebhook } from '../../../../../../utils/webhooks'
+import { requireAdminSession } from '../../../../../utils/auth'
+import { deleteWebhook } from '../../../../../utils/webhooks'
 
 export default defineEventHandler(async (event) => {
   await requireAdminSession(event)

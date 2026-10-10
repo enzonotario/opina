@@ -1,7 +1,7 @@
 import * as v from 'valibot'
-import { WebhookPatchSchema } from '../../../../../../../shared/webhooks'
-import { requireAdminSession } from '../../../../../../utils/auth'
-import { updateWebhook } from '../../../../../../utils/webhooks'
+import { WebhookPatchSchema } from '../../../../../../shared/webhooks'
+import { requireAdminSession } from '../../../../../utils/auth'
+import { updateWebhook } from '../../../../../utils/webhooks'
 
 export default defineEventHandler(async (event) => {
   await requireAdminSession(event)
