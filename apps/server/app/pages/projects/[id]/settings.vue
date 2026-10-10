@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ProjectDto } from '../../../shared/projects'
+import type { WebhookDto } from '../../../shared/webhooks'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -16,6 +17,16 @@ if (error.value) {
     statusMessage: error.value.statusMessage || 'Project not found',
   })
 }
+
+const { data: webhookData, refresh: refreshWebhooks } = await useFetch<{ webhooks: WebhookDto[] }>(
+  () => `/api/admin/projects/${id.value}/webhooks`,
+)
+
+const hookName = ref('')
+const hookUrl = ref('')
+const hookSecret = ref('')
+const hookPending = ref(false)
+const hookError = ref('')
 
 const name = ref(data.value!.project.name)
 const originsText = ref(data.value!.project.allowedOrigins.join('\n'))
@@ -89,6 +100,48 @@ async function removeProject() {
 async function copySnippet() {
   await navigator.clipboard.writeText(snippet.value)
   toast.add({ title: 'Snippet copied', color: 'success' })
+}
+
+function deliveryLabel(hook: WebhookDto) {
+  if (!hook.lastDeliveryAt) return 'No deliveries yet'
+  if (hook.lastStatus && hook.lastStatus >= 200 && hook.lastStatus < 300) return 'Last delivery ok'
+  return hook.lastError || 'Last delivery failed'
+}
+
+async function addWebhook() {
+  hookError.value = ''
+  hookPending.value = true
+  try {
+    await $fetch(`/api/admin/projects/${id.value}/webhooks`, {
+      method: 'POST',
+      body: { name: hookName.value, url: hookUrl.value, secret: hookSecret.value },
+    })
+    hookName.value = ''
+    hookUrl.value = ''
+    hookSecret.value = ''
+    await refreshWebhooks()
+    toast.add({ title: 'Webhook added', color: 'success' })
+  } catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
+    hookError.value = err.data?.statusMessage || err.statusMessage || 'Could not add webhook'
+  } finally {
+    hookPending.value = false
+  }
+}
+
+async function toggleWebhook(hook: WebhookDto, enabled: boolean) {
+  await $fetch(`/api/admin/projects/${id.value}/webhooks/${hook.id}`, {
+    method: 'PATCH',
+    body: { enabled },
+  })
+  await refreshWebhooks()
+}
+
+async function removeWebhook(hook: WebhookDto) {
+  if (!confirm(`Delete webhook “${hook.name}”?`)) return
+  await $fetch(`/api/admin/projects/${id.value}/webhooks/${hook.id}`, { method: 'DELETE' })
+  await refreshWebhooks()
+  toast.add({ title: 'Webhook deleted', color: 'success' })
 }
 
 async function copyKey() {
@@ -229,6 +282,104 @@ async function copyKey() {
             />
           </div>
           <pre class="overflow-x-auto rounded-lg border border-default bg-elevated/50 p-4 text-sm font-mono whitespace-pre-wrap">{{ snippet }}</pre>
+        </section>
+
+        <section class="space-y-3 border-t border-default pt-6">
+          <div>
+            <h2 class="font-medium text-highlighted">
+              Webhooks
+            </h2>
+            <p class="text-sm text-muted mt-0.5">
+              Opina POSTs each new response as JSON. The request includes
+              <code>Authorization: Bearer</code> with the secret and
+              <code>X-Opina-Signature: sha256=…</code> over the raw body.
+              Event: <code>response.created</code>.
+            </p>
+          </div>
+
+          <div
+            v-if="webhookData?.webhooks.length"
+            class="rounded-lg border border-default bg-elevated/50 divide-y divide-default"
+          >
+            <div
+              v-for="hook in webhookData.webhooks"
+              :key="hook.id"
+              class="p-4 flex items-start justify-between gap-4"
+            >
+              <div class="min-w-0">
+                <p class="font-medium text-highlighted truncate">
+                  {{ hook.name }}
+                </p>
+                <p class="text-sm text-muted truncate">
+                  {{ hook.url }}
+                </p>
+                <p class="text-xs text-muted mt-1">
+                  Secret ····{{ hook.secretTail }} · {{ deliveryLabel(hook) }}
+                </p>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <USwitch
+                  :model-value="hook.enabled"
+                  @update:model-value="toggleWebhook(hook, Boolean($event))"
+                />
+                <UButton
+                  size="sm"
+                  color="error"
+                  variant="ghost"
+                  label="Delete"
+                  @click="removeWebhook(hook)"
+                />
+              </div>
+            </div>
+          </div>
+
+          <form
+            class="rounded-lg border border-default bg-elevated/50 p-4 space-y-3"
+            @submit.prevent="addWebhook"
+          >
+            <UFormField label="Name" name="hook-name" required>
+              <UInput
+                v-model="hookName"
+                class="w-full"
+                placeholder="Notifications"
+                required
+              />
+            </UFormField>
+            <UFormField label="URL" name="hook-url" required>
+              <UInput
+                v-model="hookUrl"
+                class="w-full"
+                type="url"
+                placeholder="https://example.com/hooks/opina"
+                required
+              />
+            </UFormField>
+            <UFormField
+              label="Secret"
+              name="hook-secret"
+              description="At least 16 characters. Sent as a bearer token and used to sign the body."
+              required
+            >
+              <UInput
+                v-model="hookSecret"
+                class="w-full"
+                type="password"
+                required
+                minlength="16"
+              />
+            </UFormField>
+            <UAlert
+              v-if="hookError"
+              color="error"
+              variant="subtle"
+              :title="hookError"
+            />
+            <UButton
+              type="submit"
+              :loading="hookPending"
+              label="Add webhook"
+            />
+          </form>
         </section>
 
         <section class="space-y-3 border-t border-default pt-6">

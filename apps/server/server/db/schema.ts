@@ -70,6 +70,28 @@ export const responses = sqliteTable(
   ],
 )
 
+export const webhooks = sqliteTable(
+  'webhooks',
+  {
+    id: text('id').primaryKey(),
+    projectId: text('project_id')
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    name: text('name').notNull(),
+    url: text('url').notNull(),
+    secret: text('secret').notNull(),
+    enabled: integer('enabled').notNull().default(1),
+    lastStatus: integer('last_status'),
+    lastError: text('last_error'),
+    lastDeliveryAt: integer('last_delivery_at'),
+    createdAt: integer('created_at').notNull(),
+    updatedAt: integer('updated_at').notNull(),
+  },
+  table => [
+    index('webhooks_project_idx').on(table.projectId),
+  ],
+)
+
 export const settings = sqliteTable('settings', {
   key: text('key').primaryKey(),
   value: text('value').notNull(),

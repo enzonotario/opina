@@ -18,6 +18,7 @@ import { clientIp } from '../../../utils/request-ip'
 import { parseJsonBody } from '../../../utils/json-body'
 import { buildResponseMetadata } from '../../../utils/response-metadata'
 import { isVisitorDailyCapReached } from '../../../utils/visitor-limit'
+import { deliverResponseWebhooks } from '../../../utils/webhooks'
 
 const MIN_SHOWN_MS = 1000
 const FAKE_OK = { ok: true as const }
@@ -101,20 +102,38 @@ export default defineEventHandler(async (event) => {
   }
 
   const id = createId('rsp')
+  const createdAt = Date.now()
+  const urlPath = (body.path.split('?')[0] || '/').slice(0, 2048)
+  const urlHost = hostFromOrigin(origin, body.host || '').slice(0, 255)
   useDb().insert(responses).values({
     id,
     projectId: project.id,
     surveyId: survey.id,
     score: body.score ?? null,
     comment: body.comment || null,
-    urlPath: (body.path.split('?')[0] || '/').slice(0, 2048),
-    urlHost: hostFromOrigin(origin, body.host || '').slice(0, 255),
+    urlPath,
+    urlHost,
     locale: body.locale || null,
     device: body.device || null,
     visitorId: body.visitorId,
     metadata,
-    createdAt: Date.now(),
+    createdAt,
   }).run()
+
+  await deliverResponseWebhooks({
+    responseId: id,
+    projectId: project.id,
+    projectName: project.name,
+    surveyId: survey.id,
+    surveyName: survey.name,
+    score: body.score ?? null,
+    comment: body.comment || null,
+    path: urlPath.slice(0, 300),
+    host: urlHost,
+    locale: body.locale || null,
+    device: body.device || null,
+    createdAt,
+  })
 
   return { ok: true, id }
 })
