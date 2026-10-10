@@ -18,7 +18,9 @@ import { clientIp } from '../../../utils/request-ip'
 import { parseJsonBody } from '../../../utils/json-body'
 import { buildResponseMetadata } from '../../../utils/response-metadata'
 import { isVisitorDailyCapReached } from '../../../utils/visitor-limit'
+import { toSurveyDto } from '../../../utils/surveys'
 import { deliverResponseWebhooks } from '../../../utils/webhooks'
+import { responseAnswerLabel } from '../../../utils/webhook-payload'
 
 const MIN_SHOWN_MS = 1000
 const FAKE_OK = { ok: true as const }
@@ -120,13 +122,22 @@ export default defineEventHandler(async (event) => {
     createdAt,
   }).run()
 
+  const surveyDto = toSurveyDto(survey)
   await deliverResponseWebhooks({
     responseId: id,
     projectId: project.id,
     projectName: project.name,
     surveyId: survey.id,
     surveyName: survey.name,
+    surveyType: surveyDto.type,
     score: body.score ?? null,
+    answer: responseAnswerLabel({
+      surveyType: surveyDto.type,
+      score: body.score ?? null,
+      locale: body.locale || null,
+      fallbackLocale: surveyDto.appearance.locale,
+      options: surveyDto.appearance.options,
+    }),
     comment: body.comment || null,
     path: urlPath.slice(0, 300),
     host: urlHost,
