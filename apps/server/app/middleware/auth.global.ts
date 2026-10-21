@@ -1,10 +1,17 @@
 export default defineNuxtRouteMiddleware(async (to) => {
-  const { data } = await useFetch('/api/admin/me', {
+  const { loggedIn } = useUserSession()
+  const { data, refresh } = await useFetch('/api/admin/me', {
     key: 'admin-me',
   })
 
+  // First /me stays cached as logged-out. Refresh when the session disagrees.
+  if (loggedIn.value !== !!data.value?.user) {
+    await refresh()
+  }
+
   const isSetupRoute = to.path.startsWith('/setup/')
   const isInstallRoute = to.path === '/install'
+  const isLoggedIn = loggedIn.value || !!data.value?.user
 
   if (data.value?.needsSetup) {
     if (isSetupRoute || isInstallRoute) return
@@ -12,14 +19,14 @@ export default defineNuxtRouteMiddleware(async (to) => {
   }
 
   if (isSetupRoute || isInstallRoute || to.path === '/setup') {
-    return navigateTo(data.value?.user ? '/' : '/login')
+    return navigateTo(isLoggedIn ? '/' : '/login')
   }
 
-  if (!data.value?.user && to.path !== '/login') {
+  if (!isLoggedIn && to.path !== '/login') {
     return navigateTo('/login')
   }
 
-  if (data.value?.user && to.path === '/login') {
+  if (isLoggedIn && to.path === '/login') {
     return navigateTo('/')
   }
 })
