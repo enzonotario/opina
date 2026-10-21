@@ -13,6 +13,8 @@ export const projects = sqliteTable('projects', {
   name: text('name').notNull(),
   publicKey: text('public_key').notNull().unique(),
   allowedOrigins: text('allowed_origins').notNull().default('[]'),
+  homepage: text('homepage'),
+  logoUrl: text('logo_url'),
   settings: text('settings').notNull().default('{}'),
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),

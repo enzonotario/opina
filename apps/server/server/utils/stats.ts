@@ -213,6 +213,7 @@ export type AccountStats = Omit<ProjectStats, 'recentComments' | 'worstPages'> &
   projects: Array<{
     id: string
     name: string
+    logoUrl: string | null
     total: number
     csatPercent: number | null
   }>
@@ -384,6 +385,7 @@ export function getAccountStats(days = 30): AccountStats {
       return {
         id: p.id,
         name: p.name,
+        logoUrl: p.logoUrl,
         total: entry.total,
         csatPercent: csatPercent(entry.csat),
       }

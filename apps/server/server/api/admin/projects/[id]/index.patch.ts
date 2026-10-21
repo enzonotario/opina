@@ -29,6 +29,8 @@ export default defineEventHandler(async (event) => {
   if (body.allowedOrigins !== undefined) {
     patch.allowedOrigins = JSON.stringify(body.allowedOrigins)
   }
+  if (body.homepage !== undefined) patch.homepage = body.homepage || null
+  if (body.logoUrl !== undefined) patch.logoUrl = body.logoUrl || null
   if (body.settings !== undefined) {
     patch.settings = JSON.stringify({
       ...JSON.parse(existing.settings || '{}'),

@@ -27,7 +27,6 @@ async function go(to: string) {
 }
 
 const label = computed(() => currentProject.value?.name || 'Select project')
-const initial = computed(() => (label.value || 'O').slice(0, 1).toUpperCase())
 </script>
 
 <template>
@@ -46,10 +45,13 @@ const initial = computed(() => (label.value || 'O').slice(0, 1).toUpperCase())
       ]"
     >
       <span
-        class="size-6 rounded-md flex items-center justify-center text-[11px] font-semibold shrink-0"
-        :class="currentProject ? 'bg-primary text-inverted' : 'bg-muted text-muted'"
+        class="size-6 shrink-0"
       >
-        {{ initial }}
+        <ProjectMark
+          :name="label"
+          :logo-url="currentProject?.logoUrl"
+          class="size-6"
+        />
       </span>
       <span
         v-if="!collapsed"
@@ -83,9 +85,11 @@ const initial = computed(() => (label.value || 'O').slice(0, 1).toUpperCase())
             :class="projectId === p.id ? 'bg-elevated' : ''"
             @click="go(`/projects/${p.id}`)"
           >
-            <span class="size-7 rounded-md bg-primary/10 text-primary flex items-center justify-center text-xs font-bold shrink-0">
-              {{ p.name.slice(0, 1).toUpperCase() }}
-            </span>
+            <ProjectMark
+              :name="p.name"
+              :logo-url="p.logoUrl"
+              class="size-7 text-xs"
+            />
             <span class="min-w-0 flex-1">
               <span class="block truncate font-medium text-highlighted">{{ p.name }}</span>
               <span class="block truncate text-[11px] text-muted">

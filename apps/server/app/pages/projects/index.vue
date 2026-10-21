@@ -168,13 +168,20 @@ async function createProject() {
               :to="`/projects/${project.id}`"
               class="flex items-center justify-between gap-4 px-4 py-3 hover:bg-elevated/50 transition-colors"
             >
-              <div class="min-w-0">
-                <p class="font-medium text-highlighted truncate">
-                  {{ project.name }}
-                </p>
-                <p class="text-xs text-muted font-mono truncate">
-                  {{ project.publicKey }}
-                </p>
+              <div class="min-w-0 flex items-center gap-3">
+                <ProjectMark
+                  :name="project.name"
+                  :logo-url="project.logoUrl"
+                  class="size-8"
+                />
+                <div class="min-w-0">
+                  <p class="font-medium text-highlighted truncate">
+                    {{ project.name }}
+                  </p>
+                  <p class="text-xs text-muted font-mono truncate">
+                    {{ project.publicKey }}
+                  </p>
+                </div>
               </div>
               <div class="text-right shrink-0">
                 <p class="text-sm font-medium text-highlighted">

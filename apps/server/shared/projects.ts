@@ -18,14 +18,48 @@ export const OriginSchema = v.pipe(
   ),
 )
 
+function isHttpUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/** Empty string clears the field. A host without a scheme becomes https. */
+export function normalizeHttpUrl(value: string): string | null {
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  const withScheme = /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`
+  if (!isHttpUrl(withScheme)) {
+    throw new Error('Must be an http(s) URL')
+  }
+  return new URL(withScheme).toString()
+}
+
+const OptionalHttpUrlSchema = v.optional(v.nullable(v.union([
+  v.literal(''),
+  v.pipe(
+    v.string(),
+    v.trim(),
+    v.maxLength(2048),
+    v.check(isHttpUrl, 'Must be an http(s) URL'),
+  ),
+])))
+
 export const ProjectCreateSchema = v.object({
   name: v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120)),
   allowedOrigins: v.optional(v.pipe(v.array(OriginSchema), v.maxLength(50)), []),
+  homepage: OptionalHttpUrlSchema,
+  logoUrl: OptionalHttpUrlSchema,
 })
 
 export const ProjectUpdateSchema = v.object({
   name: v.optional(v.pipe(v.string(), v.trim(), v.minLength(1), v.maxLength(120))),
   allowedOrigins: v.optional(v.pipe(v.array(OriginSchema), v.maxLength(50))),
+  homepage: OptionalHttpUrlSchema,
+  logoUrl: OptionalHttpUrlSchema,
   settings: v.optional(v.record(v.string(), v.unknown())),
 })
 
@@ -37,6 +71,8 @@ export type ProjectDto = {
   name: string
   publicKey: string
   allowedOrigins: string[]
+  homepage: string | null
+  logoUrl: string | null
   settings: Record<string, unknown>
   createdAt: number
   updatedAt: number

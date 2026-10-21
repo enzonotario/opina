@@ -30,6 +30,8 @@ export function toProjectDto(row: typeof projects.$inferSelect): ProjectDto {
     name: row.name,
     publicKey: row.publicKey,
     allowedOrigins: parseJsonArray(row.allowedOrigins),
+    homepage: row.homepage || null,
+    logoUrl: row.logoUrl || null,
     settings: parseJsonObject(row.settings),
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
@@ -56,6 +58,8 @@ export function getProjectOrThrow(id: string) {
 export function createProject(input: {
   name: string
   allowedOrigins?: string[]
+  homepage?: string | null
+  logoUrl?: string | null
 }) {
   const now = Date.now()
   const row = {
@@ -63,6 +67,8 @@ export function createProject(input: {
     name: input.name,
     publicKey: createId('pk'),
     allowedOrigins: JSON.stringify(input.allowedOrigins || []),
+    homepage: input.homepage || null,
+    logoUrl: input.logoUrl || null,
     settings: '{}',
     createdAt: now,
     updatedAt: now,

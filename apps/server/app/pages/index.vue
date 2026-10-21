@@ -17,6 +17,7 @@ type AccountStats = {
   projects: Array<{
     id: string
     name: string
+    logoUrl: string | null
     total: number
     csatPercent: number | null
   }>
@@ -73,13 +74,6 @@ const chartSeries = computed(() => {
     daily: row.daily,
   }))
 })
-
-function projectColor(projectId: string) {
-  const rows = stats.value?.dailyByProject || []
-  const i = rows.findIndex(r => r.projectId === projectId)
-  if (i < 0) return null
-  return CHART_COLORS[i % CHART_COLORS.length]!
-}
 
 function delta(current: number | null | undefined, previous: number | null | undefined) {
   if (current == null || previous == null) return null
@@ -225,11 +219,11 @@ function relativeTime(ms: number) {
                 :to="`/projects/${project.id}`"
                 class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 ring-1 ring-default hover:bg-elevated/50 transition-colors"
               >
-                <div class="min-w-0 flex items-start gap-2">
-                  <span
-                    v-if="projectColor(project.id)"
-                    class="mt-1.5 size-2.5 rounded-sm shrink-0 ring-1 ring-black/10 dark:ring-white/15"
-                    :style="{ backgroundColor: projectColor(project.id)! }"
+                <div class="min-w-0 flex items-center gap-2.5">
+                  <ProjectMark
+                    :name="project.name"
+                    :logo-url="project.logoUrl"
+                    class="size-7"
                   />
                   <div class="min-w-0">
                     <p class="text-sm font-medium text-highlighted truncate">

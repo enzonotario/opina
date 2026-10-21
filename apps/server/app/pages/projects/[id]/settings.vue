@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { ProjectDto } from '../../../shared/projects'
 import type { WebhookDto } from '../../../shared/webhooks'
+import { normalizeHttpUrl } from '../../../shared/projects'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))
@@ -29,9 +30,23 @@ const hookPending = ref(false)
 const hookError = ref('')
 
 const name = ref(data.value!.project.name)
+const homepage = ref(data.value!.project.homepage || '')
+const logoUrl = ref(data.value!.project.logoUrl || '')
 const originsText = ref(data.value!.project.allowedOrigins.join('\n'))
 const pending = ref(false)
 const formError = ref('')
+const faviconPending = ref(false)
+const autoLogo = ref('')
+const autoPage = ref('')
+
+let faviconTimer: ReturnType<typeof setTimeout> | undefined
+watch(homepage, (value) => {
+  clearTimeout(faviconTimer)
+  if (!value.trim().includes('.')) return
+  faviconTimer = setTimeout(() => {
+    void applyFavicon(false)
+  }, 400)
+})
 
 const publicUrl = computed(() =>
   String(config.public.url || 'http://localhost:3000').replace(/\/$/, ''),
@@ -58,22 +73,67 @@ function parseOrigins(value: string) {
     .filter(Boolean)
 }
 
+function optionalUrl(value: string) {
+  try {
+    return normalizeHttpUrl(value)
+  } catch {
+    throw new Error('Home page and logo must be http(s) URLs')
+  }
+}
+
+async function applyFavicon(force = false) {
+  const page = homepage.value.trim()
+  if (!page) return
+  let pageUrl: string | null
+  try {
+    pageUrl = normalizeHttpUrl(page)
+  } catch {
+    return
+  }
+  if (!pageUrl) return
+  const current = logoUrl.value.trim()
+  if (!force && current && current !== autoLogo.value) return
+  if (!force && pageUrl === autoPage.value && current === autoLogo.value) return
+  faviconPending.value = true
+  try {
+    if (homepage.value !== pageUrl) homepage.value = pageUrl
+    const result = await $fetch<{ logoUrl: string | null }>('/api/admin/favicon', {
+      query: { url: pageUrl },
+    })
+    if (result.logoUrl) {
+      logoUrl.value = result.logoUrl
+      autoLogo.value = result.logoUrl
+      autoPage.value = pageUrl
+    }
+  } catch {
+    // Keep whatever logo is already set. The field stays editable.
+  } finally {
+    faviconPending.value = false
+  }
+}
+
 async function save() {
   formError.value = ''
   pending.value = true
   try {
+    const homepageUrl = optionalUrl(homepage.value)
+    const logo = optionalUrl(logoUrl.value)
     await $fetch(`/api/admin/projects/${id.value}`, {
       method: 'PATCH',
       body: {
         name: name.value,
+        homepage: homepageUrl,
+        logoUrl: logo,
         allowedOrigins: parseOrigins(originsText.value),
       },
     })
+    homepage.value = homepageUrl || ''
+    logoUrl.value = logo || ''
     await refresh()
     toast.add({ title: 'Settings saved', color: 'success' })
   } catch (e: unknown) {
-    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
-    formError.value = err.data?.statusMessage || err.statusMessage || 'Save failed'
+    const err = e as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
+    formError.value = err.data?.statusMessage || err.statusMessage || err.message || 'Save failed'
   } finally {
     pending.value = false
   }
@@ -204,6 +264,54 @@ async function copyKey() {
                   class="w-full sm:w-64"
                   required
                 />
+              </UFormField>
+            </div>
+            <div class="p-4">
+              <UFormField
+                label="Home page"
+                name="homepage"
+                description="Optional. The logo is taken from this site’s favicon."
+                class="flex max-sm:flex-col justify-between items-start gap-4"
+              >
+                <UInput
+                  v-model="homepage"
+                  type="text"
+                  placeholder="https://example.com"
+                  class="w-full sm:w-64"
+                />
+              </UFormField>
+            </div>
+            <div class="p-4">
+              <UFormField
+                label="Logo"
+                name="logo"
+                description="Optional. Change it if the favicon is not the one you want."
+                class="flex max-sm:flex-col justify-between items-start gap-4"
+                :ui="{ container: 'w-full sm:max-w-sm' }"
+              >
+                <div class="flex items-center gap-2 w-full">
+                  <ProjectMark
+                    :name="name || 'P'"
+                    :logo-url="logoUrl"
+                    class="size-8"
+                  />
+                  <UInput
+                    v-model="logoUrl"
+                    type="text"
+                    placeholder="https://example.com/favicon.ico"
+                    class="flex-1"
+                  />
+                  <UButton
+                    type="button"
+                    size="sm"
+                    color="neutral"
+                    variant="outline"
+                    label="Favicon"
+                    :loading="faviconPending"
+                    :disabled="!homepage.trim()"
+                    @click="applyFavicon(true)"
+                  />
+                </div>
               </UFormField>
             </div>
             <div class="p-4">
