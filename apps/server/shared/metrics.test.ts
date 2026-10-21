@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  averageRated,
   averageScore,
   csatPercent,
+  csatPercentRated,
   matchPathPattern,
   npsScore,
   thumbsPositivePercent,
@@ -13,6 +15,36 @@ describe('csatPercent', () => {
   })
   it('counts 4–5 as positive', () => {
     expect(csatPercent([5, 4, 3, 2])).toBe(50)
+  })
+})
+
+describe('csatPercentRated', () => {
+  it('treats page feedback 4 as 4/4, and 3 as the other positive box', () => {
+    expect(csatPercentRated([{ score: 4, scaleMax: 4 }])).toBe(100)
+    expect(csatPercentRated([
+      { score: 4, scaleMax: 4 },
+      { score: 3, scaleMax: 4 },
+      { score: 2, scaleMax: 4 },
+      { score: 1, scaleMax: 4 },
+    ])).toBe(50)
+  })
+  it('does not score a helpful 4 as 4/5', () => {
+    expect(csatPercentRated([
+      { score: 4, scaleMax: 4 },
+      { score: 3, scaleMax: 5 },
+    ])).toBe(50)
+  })
+})
+
+describe('averageRated', () => {
+  it('keeps a page-feedback average out of 4', () => {
+    expect(averageRated([{ score: 4, scaleMax: 4 }])).toEqual({ average: 4, scale: 4 })
+  })
+  it('maps 4/4 onto 5 when mixed with a 5-point score', () => {
+    expect(averageRated([
+      { score: 5, scaleMax: 5 },
+      { score: 4, scaleMax: 4 },
+    ])).toEqual({ average: 5, scale: 5 })
   })
 })
 

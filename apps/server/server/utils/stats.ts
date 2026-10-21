@@ -1,5 +1,5 @@
 import { and, eq, gte, isNotNull, lt, sql } from 'drizzle-orm'
-import { averageScore, csatPercent } from '../../shared/metrics'
+import { averageRated, csatPercentRated, scaleMaxFor, type RatedScore } from '../../shared/metrics'
 import { projects, responses, surveys } from '../db/schema'
 import { useDb } from '../db/client'
 import { getProjectOrThrow, listProjects } from './projects'
@@ -15,6 +15,7 @@ export type ProjectStats = {
   csatPercent: number | null
   previousCsatPercent: number | null
   average: number | null
+  averageScale: number | null
   distribution: Array<{ score: number, count: number }>
   helpfulDistribution: Array<{ score: number, count: number }>
   thumbsPositivePercent: number | null
@@ -32,6 +33,13 @@ export type ProjectStats = {
 
 function dayKey(ms: number) {
   return new Date(ms).toISOString().slice(0, 10)
+}
+
+function ratedScore(score: number | null, surveyType: string): RatedScore | null {
+  if (score == null) return null
+  const scaleMax = scaleMaxFor(surveyType)
+  if (scaleMax == null) return null
+  return { score, scaleMax }
 }
 
 export function getProjectStats(projectId: string, days = 30): ProjectStats {
@@ -65,7 +73,14 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
   const previous = rows.filter(r => r.createdAt < from)
 
   const currentCsat = current.filter(r => r.surveyType === 'csat' && r.score != null).map(r => r.score!)
-  const previousCsat = previous.filter(r => r.surveyType === 'csat' && r.score != null).map(r => r.score!)
+  const currentRated = current.flatMap((r) => {
+    const rated = ratedScore(r.score, r.surveyType)
+    return rated ? [rated] : []
+  })
+  const previousRated = previous.flatMap((r) => {
+    const rated = ratedScore(r.score, r.surveyType)
+    return rated ? [rated] : []
+  })
   const thumbs = current.filter(r => r.surveyType === 'thumbs' && r.score != null)
   const thumbsPositive = thumbs.filter(r => r.score === 1).length
   const helpfulScores = current.filter(r => r.surveyType === 'helpful' && r.score != null).map(r => r.score!)
@@ -80,23 +95,25 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
     if (s >= 1 && s <= 4) helpfulDistMap.set(s, (helpfulDistMap.get(s) || 0) + 1)
   }
 
-  const byDay = new Map<string, number[]>()
+  const byDay = new Map<string, RatedScore[]>()
   for (let i = 0; i < days; i++) {
     const d = dayKey(from + i * 86400000 + 12 * 3600000)
     byDay.set(d, [])
   }
   for (const r of current) {
-    if (r.score == null || r.surveyType !== 'csat') continue
+    const rated = ratedScore(r.score, r.surveyType)
+    if (!rated) continue
     const key = dayKey(r.createdAt)
     const list = byDay.get(key)
-    if (list) list.push(r.score)
+    if (list) list.push(rated)
   }
 
-  const pageMap = new Map<string, number[]>()
+  const pageMap = new Map<string, RatedScore[]>()
   for (const r of current) {
-    if (r.score == null || r.surveyType !== 'csat') continue
+    const rated = ratedScore(r.score, r.surveyType)
+    if (!rated) continue
     const list = pageMap.get(r.urlPath) || []
-    list.push(r.score)
+    list.push(rated)
     pageMap.set(r.urlPath, list)
   }
 
@@ -105,8 +122,8 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
     .map(([path, scores]) => ({
       path,
       count: scores.length,
-      csatPercent: csatPercent(scores),
-      average: averageScore(scores),
+      csatPercent: csatPercentRated(scores),
+      average: averageRated(scores).average,
     }))
     .sort((a, b) => (a.csatPercent ?? 100) - (b.csatPercent ?? 100))
     .slice(0, 10)
@@ -147,9 +164,10 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
     total: current.length,
     previousTotal: previous.length,
     withComment: current.filter(r => r.comment && r.comment.trim()).length,
-    csatPercent: csatPercent(currentCsat),
-    previousCsatPercent: csatPercent(previousCsat),
-    average: averageScore(currentCsat),
+    csatPercent: csatPercentRated(currentRated),
+    previousCsatPercent: csatPercentRated(previousRated),
+    average: averageRated(currentRated).average,
+    averageScale: averageRated(currentRated).scale,
     distribution: [...distMap.entries()].map(([score, count]) => ({ score, count })),
     helpfulDistribution: [...helpfulDistMap.entries()]
       .sort((a, b) => b[0] - a[0])
@@ -160,8 +178,8 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
     daily: [...byDay.entries()].map(([day, scores]) => ({
       day,
       count: scores.length,
-      avg: averageScore(scores),
-      csatPercent: csatPercent(scores),
+      avg: averageRated(scores).average,
+      csatPercent: csatPercentRated(scores),
     })),
     worstPages,
     recentComments,
@@ -183,11 +201,12 @@ export function getProjectsSummary(days = 30) {
     .where(gte(responses.createdAt, from))
     .all()
 
-  const map = new Map<string, { total: number, csat: number[] }>()
+  const map = new Map<string, { total: number, csat: RatedScore[] }>()
   for (const r of rows) {
     const entry = map.get(r.projectId) || { total: 0, csat: [] }
     entry.total += 1
-    if (r.surveyType === 'csat' && r.score != null) entry.csat.push(r.score)
+    const rated = ratedScore(r.score, r.surveyType)
+    if (rated) entry.csat.push(rated)
     map.set(r.projectId, entry)
   }
 
@@ -195,7 +214,7 @@ export function getProjectsSummary(days = 30) {
   for (const [id, entry] of map) {
     out[id] = {
       total: entry.total,
-      csatPercent: csatPercent(entry.csat),
+      csatPercent: csatPercentRated(entry.csat),
     }
   }
   return out
@@ -274,7 +293,14 @@ export function getAccountStats(days = 30): AccountStats {
   const previous = rows.filter(r => r.createdAt < from)
 
   const currentCsat = current.filter(r => r.surveyType === 'csat' && r.score != null).map(r => r.score!)
-  const previousCsat = previous.filter(r => r.surveyType === 'csat' && r.score != null).map(r => r.score!)
+  const currentRated = current.flatMap((r) => {
+    const rated = ratedScore(r.score, r.surveyType)
+    return rated ? [rated] : []
+  })
+  const previousRated = previous.flatMap((r) => {
+    const rated = ratedScore(r.score, r.surveyType)
+    return rated ? [rated] : []
+  })
   const thumbs = current.filter(r => r.surveyType === 'thumbs' && r.score != null)
   const thumbsPositive = thumbs.filter(r => r.score === 1).length
   const helpfulScores = current.filter(r => r.surveyType === 'helpful' && r.score != null).map(r => r.score!)
@@ -294,31 +320,33 @@ export function getAccountStats(days = 30): AccountStats {
     dayKeys.push(dayKey(from + i * 86400000 + 12 * 3600000))
   }
 
-  const byDay = new Map<string, number[]>()
-  const byDayProject = new Map<string, Map<string, number[]>>()
+  const byDay = new Map<string, RatedScore[]>()
+  const byDayProject = new Map<string, Map<string, RatedScore[]>>()
   for (const d of dayKeys) {
     byDay.set(d, [])
     byDayProject.set(d, new Map())
   }
   for (const r of current) {
-    if (r.score == null || r.surveyType !== 'csat') continue
+    const rated = ratedScore(r.score, r.surveyType)
+    if (!rated) continue
     const key = dayKey(r.createdAt)
     const list = byDay.get(key)
-    if (list) list.push(r.score)
+    if (list) list.push(rated)
     const projectMap = byDayProject.get(key)
     if (projectMap) {
       const scores = projectMap.get(r.projectId) || []
-      scores.push(r.score)
+      scores.push(rated)
       projectMap.set(r.projectId, scores)
     }
   }
 
-  const pageMap = new Map<string, { projectId: string, scores: number[] }>()
+  const pageMap = new Map<string, { projectId: string, scores: RatedScore[] }>()
   for (const r of current) {
-    if (r.score == null || r.surveyType !== 'csat') continue
+    const rated = ratedScore(r.score, r.surveyType)
+    if (!rated) continue
     const key = `${r.projectId}\0${r.urlPath}`
     const entry = pageMap.get(key) || { projectId: r.projectId, scores: [] }
-    entry.scores.push(r.score)
+    entry.scores.push(rated)
     pageMap.set(key, entry)
   }
 
@@ -331,8 +359,8 @@ export function getAccountStats(days = 30): AccountStats {
         projectId: entry.projectId,
         projectName: nameById.get(entry.projectId) || entry.projectId,
         count: entry.scores.length,
-        csatPercent: csatPercent(entry.scores),
-        average: averageScore(entry.scores),
+        csatPercent: csatPercentRated(entry.scores),
+        average: averageRated(entry.scores).average,
       }
     })
     .sort((a, b) => (a.csatPercent ?? 100) - (b.csatPercent ?? 100))
@@ -370,12 +398,13 @@ export function getAccountStats(days = 30): AccountStats {
       projectName: r.projectName,
     }))
 
-  const byProject = new Map<string, { total: number, csat: number[] }>()
+  const byProject = new Map<string, { total: number, csat: RatedScore[] }>()
   for (const p of allProjects) byProject.set(p.id, { total: 0, csat: [] })
   for (const r of current) {
     const entry = byProject.get(r.projectId) || { total: 0, csat: [] }
     entry.total += 1
-    if (r.surveyType === 'csat' && r.score != null) entry.csat.push(r.score)
+    const rated = ratedScore(r.score, r.surveyType)
+    if (rated) entry.csat.push(rated)
     byProject.set(r.projectId, entry)
   }
 
@@ -387,7 +416,7 @@ export function getAccountStats(days = 30): AccountStats {
         name: p.name,
         logoUrl: p.logoUrl,
         total: entry.total,
-        csatPercent: csatPercent(entry.csat),
+        csatPercent: csatPercentRated(entry.csat),
       }
     })
     .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name))
@@ -397,8 +426,8 @@ export function getAccountStats(days = 30): AccountStats {
     return {
       day,
       count: scores.length,
-      avg: averageScore(scores),
-      csatPercent: csatPercent(scores),
+      avg: averageRated(scores).average,
+      csatPercent: csatPercentRated(scores),
     }
   })
 
@@ -412,8 +441,8 @@ export function getAccountStats(days = 30): AccountStats {
         return {
           day,
           count: scores.length,
-          avg: averageScore(scores),
-          csatPercent: csatPercent(scores),
+          avg: averageRated(scores).average,
+          csatPercent: csatPercentRated(scores),
         }
       }),
     }))
@@ -427,9 +456,10 @@ export function getAccountStats(days = 30): AccountStats {
     total: current.length,
     previousTotal: previous.length,
     withComment: current.filter(r => r.comment && r.comment.trim()).length,
-    csatPercent: csatPercent(currentCsat),
-    previousCsatPercent: csatPercent(previousCsat),
-    average: averageScore(currentCsat),
+    csatPercent: csatPercentRated(currentRated),
+    previousCsatPercent: csatPercentRated(previousRated),
+    average: averageRated(currentRated).average,
+    averageScale: averageRated(currentRated).scale,
     distribution: [...distMap.entries()].map(([score, count]) => ({ score, count })),
     helpfulDistribution: [...helpfulDistMap.entries()]
       .sort((a, b) => b[0] - a[0])

@@ -3,6 +3,7 @@ type AccountStats = {
   csatPercent: number | null
   previousCsatPercent: number | null
   average: number | null
+  averageScale: number | null
   total: number
   previousTotal: number
   withComment: number
@@ -167,7 +168,7 @@ function relativeTime(ms: number) {
               {{ stats.average == null ? '—' : stats.average }}
             </p>
             <p class="text-xs mt-1.5 text-muted">
-              Out of 5
+              Out of {{ stats.averageScale ?? 5 }}
             </p>
           </div>
           <div class="rounded-xl bg-elevated/60 ring-1 ring-default p-4">

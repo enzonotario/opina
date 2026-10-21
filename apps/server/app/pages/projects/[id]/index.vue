@@ -5,6 +5,7 @@ type StatsPayload = {
   csatPercent: number | null
   previousCsatPercent: number | null
   average: number | null
+  averageScale: number | null
   total: number
   previousTotal: number
   withComment: number
@@ -159,7 +160,7 @@ function responsesTo(query?: Record<string, string>) {
               {{ stats.average == null ? '—' : stats.average }}
             </p>
             <p class="text-xs mt-1.5 text-muted">
-              Out of 5
+              Out of {{ stats.averageScale ?? 5 }}
             </p>
           </div>
           <NuxtLink
