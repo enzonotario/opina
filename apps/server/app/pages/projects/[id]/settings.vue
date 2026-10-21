@@ -1,7 +1,6 @@
 <script setup lang="ts">
-import type { ProjectDto } from '../../../shared/projects'
-import type { WebhookDto } from '../../../shared/webhooks'
-import { normalizeHttpUrl } from '../../../shared/projects'
+import type { WebhookDto } from '#shared/webhooks'
+import { normalizeHttpUrl, type ProjectDto } from '#shared/projects'
 
 const route = useRoute()
 const id = computed(() => String(route.params.id))

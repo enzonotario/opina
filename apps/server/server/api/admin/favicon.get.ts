@@ -1,5 +1,5 @@
-import { requireAdminSession } from '../../../utils/auth'
-import { resolveFavicon } from '../../../utils/favicon'
+import { requireAdminSession } from '../../utils/auth'
+import { resolveFavicon } from '../../utils/favicon'
 
 export default defineEventHandler(async (event) => {
   await requireAdminSession(event)
