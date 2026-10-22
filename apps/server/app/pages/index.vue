@@ -29,14 +29,16 @@ type AccountStats = {
     projectId: string
     projectName: string
   }>
-  recentComments: Array<{
+  recentResponses: Array<{
     id: string
     score: number | null
     comment: string
     urlPath: string
     createdAt: number
+    surveyType: string
     projectId: string
     projectName: string
+    logoUrl: string | null
   }>
 }
 
@@ -83,9 +85,23 @@ function delta(current: number | null | undefined, previous: number | null | und
 
 const csatDelta = computed(() => delta(stats.value?.csatPercent, stats.value?.previousCsatPercent))
 
-function reaction(score: number | null) {
-  if (score == null || score < 1 || score > 5) return '—'
-  return EMOJIS[score - 1]
+const HELPFUL_LABELS: Record<number, string> = {
+  4: 'Muy útil',
+  3: 'Útil',
+  2: 'No útil',
+  1: 'Confuso',
+}
+
+function reaction(score: number | null, surveyType: string) {
+  if (score == null) return '—'
+  if (surveyType === 'thumbs') return score === 1 ? '👍' : '👎'
+  if (surveyType === 'helpful') return HELPFUL_LABELS[score] || String(score)
+  if (score >= 1 && score <= 5) return EMOJIS[score - 1]!
+  return String(score)
+}
+
+function openResponse(projectId: string, id: string) {
+  return navigateTo(`/projects/${projectId}/responses?response=${id}`)
 }
 
 function relativeTime(ms: number) {
@@ -243,8 +259,7 @@ function relativeTime(ms: number) {
           </ul>
         </section>
 
-        <div class="grid gap-4 lg:grid-cols-5">
-          <section class="lg:col-span-3 rounded-xl ring-1 ring-default bg-default p-5 space-y-4">
+        <section class="rounded-xl ring-1 ring-default bg-default p-5 space-y-4">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div class="min-w-0">
                 <h2 class="text-sm font-semibold text-highlighted">
@@ -285,54 +300,84 @@ function relativeTime(ms: number) {
             </div>
           </section>
 
-          <section class="lg:col-span-2 rounded-xl ring-1 ring-default bg-default p-5 space-y-3">
-            <div class="flex items-center justify-between">
+          <section class="rounded-xl ring-1 ring-default bg-default overflow-hidden">
+            <div class="flex items-center justify-between px-5 pt-5 pb-3">
               <h2 class="text-sm font-semibold text-highlighted">
-                Live comments
+                Live responses
               </h2>
-              <span class="text-xs text-muted">Mixed feed</span>
+              <span class="text-xs text-muted">Latest 20 · 30 days</span>
             </div>
-            <ul
-              v-if="stats.recentComments.length"
-              class="divide-y divide-default -mx-1"
+            <div
+              v-if="stats.recentResponses.length"
+              class="overflow-x-auto"
             >
-              <li
-                v-for="item in stats.recentComments.slice(0, 8)"
-                :key="item.id"
-                class="first:pt-0"
-              >
-                <NuxtLink
-                  :to="`/projects/${item.projectId}/responses?response=${item.id}`"
-                  class="block px-1 py-3 rounded-md hover:bg-elevated/60 transition-colors"
-                >
-                  <div class="flex items-start justify-between gap-2 mb-1">
-                    <div class="min-w-0">
-                      <span class="text-xs font-medium text-highlighted truncate block">
-                        {{ item.projectName }}
+              <table class="w-full text-sm">
+                <thead>
+                  <tr class="text-left text-xs text-muted border-y border-default">
+                    <th class="font-medium px-5 py-2 w-[22%]">
+                      Site
+                    </th>
+                    <th class="font-medium px-3 py-2 w-[18%]">
+                      Page
+                    </th>
+                    <th class="font-medium px-3 py-2">
+                      Comment
+                    </th>
+                    <th class="font-medium px-3 py-2 w-[8rem]">
+                      Reaction
+                    </th>
+                    <th class="font-medium pl-3 pr-5 py-2 w-[6rem] text-right">
+                      When
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="item in stats.recentResponses"
+                    :key="item.id"
+                    class="border-b border-default last:border-0 hover:bg-elevated/60 cursor-pointer"
+                    @click="openResponse(item.projectId, item.id)"
+                  >
+                    <td class="px-5 py-3">
+                      <span class="flex items-center gap-2 min-w-0">
+                        <ProjectMark
+                          :name="item.projectName"
+                          :logo-url="item.logoUrl"
+                          class="size-6"
+                        />
+                        <span class="truncate font-medium text-highlighted">{{ item.projectName }}</span>
                       </span>
-                      <span class="text-[11px] font-mono text-muted truncate block">{{ item.urlPath }}</span>
-                    </div>
-                    <div class="shrink-0 text-right">
-                      <span class="text-sm">{{ reaction(item.score) }}</span>
-                      <p class="text-[11px] text-muted">
-                        {{ relativeTime(item.createdAt) }}
-                      </p>
-                    </div>
-                  </div>
-                  <p class="text-sm text-highlighted line-clamp-2">
-                    {{ item.comment }}
-                  </p>
-                </NuxtLink>
-              </li>
-            </ul>
+                    </td>
+                    <td class="px-3 py-3 font-mono text-xs text-muted">
+                      <span class="block truncate">{{ item.urlPath }}</span>
+                    </td>
+                    <td class="px-3 py-3">
+                      <span
+                        v-if="item.comment"
+                        class="line-clamp-2 text-highlighted"
+                      >{{ item.comment }}</span>
+                      <span
+                        v-else
+                        class="text-muted"
+                      >—</span>
+                    </td>
+                    <td class="px-3 py-3 whitespace-nowrap">
+                      {{ reaction(item.score, item.surveyType) }}
+                    </td>
+                    <td class="pl-3 pr-5 py-3 text-right text-xs text-muted whitespace-nowrap">
+                      {{ relativeTime(item.createdAt) }}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
             <p
               v-else
               class="text-sm text-muted py-6 text-center"
             >
-              No comments yet across projects.
+              No responses yet across projects.
             </p>
           </section>
-        </div>
 
         <section class="rounded-xl ring-1 ring-default bg-default p-5 space-y-3">
           <h2 class="text-sm font-semibold text-highlighted">

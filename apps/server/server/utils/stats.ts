@@ -1,6 +1,6 @@
 import { and, eq, gte, isNotNull, lt, sql } from 'drizzle-orm'
 import { averageRated, csatPercentRated, scaleMaxFor, type RatedScore } from '../../shared/metrics'
-import { projects, responses, surveys } from '../db/schema'
+import { responses, surveys } from '../db/schema'
 import { useDb } from '../db/client'
 import { getProjectOrThrow, listProjects } from './projects'
 
@@ -241,15 +241,17 @@ export type AccountStats = Omit<ProjectStats, 'recentComments' | 'worstPages'> &
     projectName: string
     daily: AccountDailyPoint[]
   }>
-  recentComments: Array<{
+  recentResponses: Array<{
     id: string
     score: number | null
     comment: string
     urlPath: string
     createdAt: number
     surveyId: string
+    surveyType: string
     projectId: string
     projectName: string
+    logoUrl: string | null
   }>
   worstPages: Array<{
     path: string
@@ -366,36 +368,21 @@ export function getAccountStats(days = 30): AccountStats {
     .sort((a, b) => (a.csatPercent ?? 100) - (b.csatPercent ?? 100))
     .slice(0, 10)
 
-  const recentComments = db
-    .select({
-      id: responses.id,
-      score: responses.score,
-      comment: responses.comment,
-      urlPath: responses.urlPath,
-      createdAt: responses.createdAt,
-      surveyId: responses.surveyId,
-      projectId: responses.projectId,
-      projectName: projects.name,
-    })
-    .from(responses)
-    .innerJoin(projects, eq(responses.projectId, projects.id))
-    .where(and(
-      gte(responses.createdAt, from),
-      isNotNull(responses.comment),
-      sql`trim(${responses.comment}) != ''`,
-    ))
-    .all()
+  const logoById = new Map(allProjects.map(p => [p.id, p.logoUrl]))
+  const recentResponses = [...current]
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 20)
     .map(r => ({
       id: r.id,
       score: r.score,
-      comment: r.comment || '',
+      comment: (r.comment || '').trim(),
       urlPath: r.urlPath,
       createdAt: r.createdAt,
       surveyId: r.surveyId,
+      surveyType: r.surveyType,
       projectId: r.projectId,
-      projectName: r.projectName,
+      projectName: nameById.get(r.projectId) || r.projectId,
+      logoUrl: logoById.get(r.projectId) ?? null,
     }))
 
   const byProject = new Map<string, { total: number, csat: RatedScore[] }>()
@@ -471,6 +458,6 @@ export function getAccountStats(days = 30): AccountStats {
     dailyByProject,
     projects: projectRows,
     worstPages,
-    recentComments,
+    recentResponses,
   }
 }
