@@ -100,8 +100,10 @@ function reaction(score: number | null, surveyType: string) {
   return String(score)
 }
 
+const detail = ref<{ projectId: string, responseId: string } | null>(null)
+
 function openResponse(projectId: string, id: string) {
-  return navigateTo(`/projects/${projectId}/responses?response=${id}`)
+  detail.value = { projectId, responseId: id }
 }
 
 function relativeTime(ms: number) {
@@ -413,6 +415,13 @@ function relativeTime(ms: number) {
           </p>
         </section>
       </div>
+
+      <ResponseDetail
+        :project-id="detail?.projectId ?? null"
+        :response-id="detail?.responseId ?? null"
+        @close="detail = null"
+        @deleted="refreshStats()"
+      />
     </template>
   </UDashboardPanel>
 </template>

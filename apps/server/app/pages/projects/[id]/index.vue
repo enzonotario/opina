@@ -82,6 +82,8 @@ function responsesTo(query?: Record<string, string>) {
   const q = query ? `?${new URLSearchParams(query)}` : ''
   return `/projects/${project.value.id}/responses${q}`
 }
+
+const detailResponseId = ref<string | null>(null)
 </script>
 
 <template>
@@ -250,9 +252,10 @@ function responsesTo(query?: Record<string, string>) {
                 :key="item.id"
                 class="first:pt-0"
               >
-                <NuxtLink
-                  :to="responsesTo({ response: item.id })"
-                  class="group block px-1 py-3 rounded-md hover:bg-elevated/60 transition-colors"
+                <button
+                  type="button"
+                  class="group block w-full text-left px-1 py-3 rounded-md hover:bg-elevated/60 transition-colors"
+                  @click="detailResponseId = item.id"
                 >
                   <div class="flex items-start justify-between gap-2 mb-1">
                     <span class="text-[11px] font-mono text-muted truncate">{{ item.urlPath }}</span>
@@ -266,7 +269,7 @@ function responsesTo(query?: Record<string, string>) {
                   <p class="text-sm text-highlighted line-clamp-2 group-hover:underline decoration-muted/60 underline-offset-2">
                     {{ item.comment }}
                   </p>
-                </NuxtLink>
+                </button>
               </li>
             </ul>
             <p
@@ -310,6 +313,13 @@ function responsesTo(query?: Record<string, string>) {
           </p>
         </section>
       </div>
+
+      <ResponseDetail
+        :project-id="project.id"
+        :response-id="detailResponseId"
+        @close="detailResponseId = null"
+        @deleted="refreshStats()"
+      />
     </template>
   </UDashboardPanel>
 </template>
