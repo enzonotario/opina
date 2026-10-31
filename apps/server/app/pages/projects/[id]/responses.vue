@@ -575,8 +575,8 @@ watch(scoreFilterItems, (items) => {
             <table class="min-w-full text-sm">
               <thead class="sticky top-0 z-10 bg-elevated text-left text-xs text-muted border-b border-default">
                 <tr>
-                  <th class="px-3 py-2.5 font-medium w-10">
-                    <span class="sr-only">Status</span>
+                  <th class="px-3 py-2.5 font-medium w-20">
+                    Resolved
                   </th>
                   <th class="px-3 py-2.5 font-medium w-28">
                     Screenshot

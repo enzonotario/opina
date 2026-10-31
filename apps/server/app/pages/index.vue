@@ -39,6 +39,7 @@ type AccountStats = {
     projectId: string
     projectName: string
     logoUrl: string | null
+    resolved: boolean
   }>
 }
 
@@ -328,6 +329,9 @@ function relativeTime(ms: number) {
                   <th class="font-medium px-3 py-2 w-[8rem]">
                     Reaction
                   </th>
+                  <th class="font-medium px-3 py-2 w-[6rem]">
+                    Resolved
+                  </th>
                   <th class="font-medium pl-3 pr-5 py-2 w-[6rem] text-right">
                     When
                   </th>
@@ -365,6 +369,14 @@ function relativeTime(ms: number) {
                   </td>
                   <td class="px-3 py-3 whitespace-nowrap">
                     {{ reaction(item.score, item.surveyType) }}
+                  </td>
+                  <td class="px-3 py-3">
+                    <UIcon
+                      :name="item.resolved ? 'i-lucide-circle-check' : 'i-lucide-circle'"
+                      class="size-4"
+                      :class="item.resolved ? 'text-success' : 'text-muted'"
+                      :title="item.resolved ? 'Resolved' : 'Open'"
+                    />
                   </td>
                   <td class="pl-3 pr-5 py-3 text-right text-xs text-muted whitespace-nowrap">
                     {{ relativeTime(item.createdAt) }}

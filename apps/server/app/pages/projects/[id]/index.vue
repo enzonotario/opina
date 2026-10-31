@@ -20,6 +20,7 @@ type StatsPayload = {
     comment: string
     urlPath: string
     createdAt: number
+    resolved: boolean
   }>
 }
 
@@ -258,7 +259,15 @@ const detailResponseId = ref<string | null>(null)
                   @click="detailResponseId = item.id"
                 >
                   <div class="flex items-start justify-between gap-2 mb-1">
-                    <span class="text-[11px] font-mono text-muted truncate">{{ item.urlPath }}</span>
+                    <span class="flex items-center gap-1.5 min-w-0">
+                      <UIcon
+                        :name="item.resolved ? 'i-lucide-circle-check' : 'i-lucide-circle'"
+                        class="size-3.5 shrink-0"
+                        :class="item.resolved ? 'text-success' : 'text-muted'"
+                        :title="item.resolved ? 'Resolved' : 'Open'"
+                      />
+                      <span class="text-[11px] font-mono text-muted truncate">{{ item.urlPath }}</span>
+                    </span>
                     <div class="shrink-0 text-right">
                       <span class="text-sm">{{ reaction(item.score) }}</span>
                       <p class="text-[11px] text-muted">

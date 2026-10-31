@@ -28,6 +28,7 @@ export type ProjectStats = {
     urlPath: string
     createdAt: number
     surveyId: string
+    resolved: boolean
   }>
 }
 
@@ -136,6 +137,7 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
       urlPath: responses.urlPath,
       createdAt: responses.createdAt,
       surveyId: responses.surveyId,
+      resolved: responses.resolved,
     })
     .from(responses)
     .where(and(
@@ -154,6 +156,7 @@ export function getProjectStats(projectId: string, days = 30): ProjectStats {
       urlPath: r.urlPath,
       createdAt: r.createdAt,
       surveyId: r.surveyId,
+      resolved: r.resolved === 1,
     }))
 
   return {
@@ -252,6 +255,7 @@ export type AccountStats = Omit<ProjectStats, 'recentComments' | 'worstPages'> &
     projectId: string
     projectName: string
     logoUrl: string | null
+    resolved: boolean
   }>
   worstPages: Array<{
     path: string
@@ -282,6 +286,7 @@ export function getAccountStats(days = 30): AccountStats {
       createdAt: responses.createdAt,
       surveyId: responses.surveyId,
       surveyType: surveys.type,
+      resolved: responses.resolved,
     })
     .from(responses)
     .innerJoin(surveys, eq(responses.surveyId, surveys.id))
@@ -383,6 +388,7 @@ export function getAccountStats(days = 30): AccountStats {
       projectId: r.projectId,
       projectName: nameById.get(r.projectId) || r.projectId,
       logoUrl: logoById.get(r.projectId) ?? null,
+      resolved: r.resolved === 1,
     }))
 
   const byProject = new Map<string, { total: number, csat: RatedScore[] }>()
