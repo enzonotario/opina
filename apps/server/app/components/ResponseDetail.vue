@@ -180,9 +180,14 @@ function fmt(ts: number) {
   return new Date(ts).toLocaleString(undefined, {
     day: '2-digit',
     month: 'short',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function fmtIso(ts: number) {
+  return new Date(ts).toISOString()
 }
 
 async function setResolved(resolved: boolean) {
@@ -367,7 +372,16 @@ async function removeResponse() {
             <dt class="text-xs text-muted">
               Date
             </dt>
-            <dd>{{ fmt(detail.createdAt) }}</dd>
+            <dd>
+              <UTooltip
+                :text="fmtIso(detail.createdAt)"
+                :delay-duration="200"
+              >
+                <span class="cursor-default tabular-nums">
+                  {{ fmt(detail.createdAt) }}
+                </span>
+              </UTooltip>
+            </dd>
           </div>
           <div>
             <dt class="text-xs text-muted">

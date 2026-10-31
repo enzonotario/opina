@@ -297,9 +297,14 @@ function fmt(ts: number) {
   return new Date(ts).toLocaleString(undefined, {
     day: '2-digit',
     month: 'short',
+    year: 'numeric',
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function fmtIso(ts: number) {
+  return new Date(ts).toISOString()
 }
 
 function pickI18n(map: Record<string, string> | undefined, locale: string, fallback: string) {
@@ -665,7 +670,14 @@ watch(scoreFilterItems, (items) => {
                     </span>
                   </td>
                   <td class="px-3 py-2 whitespace-nowrap text-muted text-xs">
-                    {{ fmt(row.createdAt) }}
+                    <UTooltip
+                      :text="fmtIso(row.createdAt)"
+                      :delay-duration="200"
+                    >
+                      <span class="cursor-default tabular-nums">
+                        {{ fmt(row.createdAt) }}
+                      </span>
+                    </UTooltip>
                   </td>
                   <td class="px-3 py-2">
                     <UIcon
