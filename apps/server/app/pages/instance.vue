@@ -45,7 +45,6 @@ const mcpSnippet = computed(() => [
   mcpUrl.value,
 ].join('\n'))
 
-
 async function runNow() {
   pending.value = true
   try {
