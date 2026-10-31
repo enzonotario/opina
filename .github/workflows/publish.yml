@@ -19,23 +19,10 @@ jobs:
         with:
           bun-version: 1.3.14
 
-      # Node 24+ required for reliable npm trusted publishing (OIDC).
-      # Do not set registry-url: setup-node writes an empty _authToken that disables OIDC.
+      # Install with Node 22 so better-sqlite3 can use prebuilds (runners default to 24).
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
-
-      - name: Ensure npm CLI supports trusted publishing
-        run: npm install -g npm@latest
-
-      - name: Clear classic npm auth so OIDC can run
-        run: |
-          unset NODE_AUTH_TOKEN
-          for f in "${NPM_CONFIG_USERCONFIG:-}" "$HOME/.npmrc" .npmrc; do
-            [ -n "$f" ] && [ -f "$f" ] || continue
-            sed -i '/_authToken/d' "$f" || true
-            sed -i '/always-auth/d' "$f" || true
-          done
+          node-version: 22
 
       - run: bun install --frozen-lockfile
 
@@ -54,6 +41,24 @@ jobs:
           " "$version"
 
       - run: bun run --filter @opina/widget build
+
+      # Node 24+ required for reliable npm trusted publishing (OIDC).
+      # Do not set registry-url: setup-node writes an empty _authToken that disables OIDC.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Ensure npm CLI supports trusted publishing
+        run: npm install -g npm@latest
+
+      - name: Clear classic npm auth so OIDC can run
+        run: |
+          unset NODE_AUTH_TOKEN
+          for f in "${NPM_CONFIG_USERCONFIG:-}" "$HOME/.npmrc" .npmrc; do
+            [ -n "$f" ] && [ -f "$f" ] || continue
+            sed -i '/_authToken/d' "$f" || true
+            sed -i '/always-auth/d' "$f" || true
+          done
 
       - name: Debug OIDC environment
         run: |
