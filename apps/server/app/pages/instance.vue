@@ -10,9 +10,34 @@ type BackupStatus = {
   retention: number
 }
 
+type AccessTokenRow = {
+  id: string
+  name: string
+  tokenPrefix: string
+  createdAt: number
+  lastUsedAt: number | null
+}
+
+type CreatedToken = AccessTokenRow & { token: string }
+
 const toast = useToast()
+const config = useRuntimeConfig()
 const { data, refresh, status } = await useFetch<{ backup: BackupStatus }>('/api/admin/backup/status')
+const {
+  data: tokensData,
+  refresh: refreshTokens,
+  status: tokensStatus,
+} = await useFetch<{ tokens: AccessTokenRow[] }>('/api/admin/tokens')
+
 const pending = ref(false)
+const tokenName = ref('')
+const creatingToken = ref(false)
+const revokingId = ref<string | null>(null)
+const createdPlaintext = ref<string | null>(null)
+
+const mcpUrl = computed(() =>
+  `${String(config.public.url || 'http://localhost:3000').replace(/\/$/, '')}/mcp`,
+)
 
 async function runNow() {
   pending.value = true
@@ -29,6 +54,59 @@ async function runNow() {
     await refresh()
   } finally {
     pending.value = false
+  }
+}
+
+async function createToken() {
+  if (!tokenName.value.trim() || creatingToken.value) return
+  creatingToken.value = true
+  try {
+    const res = await $fetch<{ token: CreatedToken }>('/api/admin/tokens', {
+      method: 'POST',
+      body: { name: tokenName.value.trim() },
+    })
+    createdPlaintext.value = res.token.token
+    tokenName.value = ''
+    await refreshTokens()
+    toast.add({ title: 'Token created — copy it now', color: 'success' })
+  } catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
+    toast.add({
+      title: err.data?.statusMessage || err.statusMessage || 'Create failed',
+      color: 'error',
+    })
+  } finally {
+    creatingToken.value = false
+  }
+}
+
+async function revokeToken(row: AccessTokenRow) {
+  if (!confirm(`Revoke token “${row.name}”? MCP clients using it will stop working.`)) return
+  revokingId.value = row.id
+  try {
+    await $fetch(`/api/admin/tokens/${row.id}`, { method: 'DELETE' })
+    if (createdPlaintext.value?.startsWith(row.tokenPrefix)) {
+      createdPlaintext.value = null
+    }
+    await refreshTokens()
+    toast.add({ title: 'Token revoked', color: 'success' })
+  } catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
+    toast.add({
+      title: err.data?.statusMessage || err.statusMessage || 'Revoke failed',
+      color: 'error',
+    })
+  } finally {
+    revokingId.value = null
+  }
+}
+
+async function copyText(value: string, label: string) {
+  try {
+    await navigator.clipboard.writeText(value)
+    toast.add({ title: `${label} copied`, color: 'success' })
+  } catch {
+    toast.add({ title: 'Copy failed', color: 'error' })
   }
 }
 
@@ -76,6 +154,109 @@ function bytes(n: number | null) {
           title="Backups disabled"
           description="Configure S3-compatible storage in your environment to enable automatic backups."
         />
+
+        <section class="rounded-lg border border-default p-4 bg-default space-y-4">
+          <div class="space-y-1">
+            <h2 class="font-medium text-highlighted">
+              MCP access
+            </h2>
+            <p class="text-sm text-muted">
+              Personal access tokens for remote MCP clients (Cursor, Claude, etc.).
+              Endpoint:
+              <code class="font-mono text-xs text-highlighted">{{ mcpUrl }}</code>
+            </p>
+          </div>
+
+          <div class="flex flex-wrap items-end gap-2">
+            <UFormField
+              label="Token name"
+              class="min-w-48 flex-1"
+            >
+              <UInput
+                v-model="tokenName"
+                placeholder="e.g. Cursor triage"
+                size="sm"
+                @keydown.enter.prevent="createToken"
+              />
+            </UFormField>
+            <UButton
+              size="sm"
+              label="Create token"
+              icon="i-lucide-key-round"
+              :loading="creatingToken"
+              :disabled="!tokenName.trim()"
+              @click="createToken"
+            />
+          </div>
+
+          <UAlert
+            v-if="createdPlaintext"
+            color="warning"
+            variant="subtle"
+            title="Copy this token now — it will not be shown again"
+          >
+            <template #description>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <code class="font-mono text-xs break-all text-highlighted">{{ createdPlaintext }}</code>
+                <UButton
+                  size="xs"
+                  color="neutral"
+                  variant="soft"
+                  label="Copy"
+                  icon="i-lucide-copy"
+                  @click="copyText(createdPlaintext!, 'Token')"
+                />
+              </div>
+            </template>
+          </UAlert>
+
+          <div
+            v-if="tokensStatus === 'pending' && !tokensData"
+            class="text-sm text-muted"
+          >
+            Loading tokens…
+          </div>
+          <ul
+            v-else-if="tokensData?.tokens.length"
+            class="divide-y divide-default rounded-lg border border-default"
+          >
+            <li
+              v-for="row in tokensData.tokens"
+              :key="row.id"
+              class="flex flex-wrap items-center justify-between gap-3 px-3 py-2.5 text-sm"
+            >
+              <div class="min-w-0">
+                <p class="font-medium text-highlighted truncate">
+                  {{ row.name }}
+                </p>
+                <p class="text-xs text-muted font-mono truncate">
+                  {{ row.tokenPrefix }}…
+                  · created {{ fmt(row.createdAt) }}
+                  · last used {{ fmt(row.lastUsedAt) }}
+                </p>
+              </div>
+              <UButton
+                size="xs"
+                color="error"
+                variant="ghost"
+                label="Revoke"
+                :loading="revokingId === row.id"
+                :disabled="!!revokingId"
+                @click="revokeToken(row)"
+              />
+            </li>
+          </ul>
+          <p
+            v-else
+            class="text-sm text-muted"
+          >
+            No tokens yet.
+          </p>
+
+          <pre class="rounded-lg bg-muted p-3 text-[11px] font-mono overflow-x-auto text-highlighted">Authorization: Bearer opina_pat_…
+# Cursor / Claude MCP server URL:
+{{ mcpUrl }}</pre>
+        </section>
 
         <section class="rounded-lg border border-default p-4 bg-default space-y-3">
           <h2 class="font-medium text-highlighted">

@@ -109,6 +109,16 @@ export const settings = sqliteTable('settings', {
   updatedAt: integer('updated_at').notNull(),
 })
 
+/** Personal access tokens for MCP / API auth (store hash only). */
+export const accessTokens = sqliteTable('access_tokens', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  tokenHash: text('token_hash').notNull().unique(),
+  tokenPrefix: text('token_prefix').notNull(),
+  createdAt: integer('created_at').notNull(),
+  lastUsedAt: integer('last_used_at'),
+})
+
 export const importJobs = sqliteTable(
   'import_jobs',
   {

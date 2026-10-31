@@ -57,6 +57,13 @@
       "when": 1793448000000,
       "tag": "0007_response_resolved",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1793456400000,
+      "tag": "0008_access_tokens",
+      "breakpoints": true
     }
   ]
 }
