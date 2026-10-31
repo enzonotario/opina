@@ -14,6 +14,7 @@ export type ResponseFilters = {
   scores?: number[]
   path?: string
   hasComment?: boolean
+  resolved?: boolean
   q?: string
   limit?: number
   offset?: number
@@ -46,7 +47,27 @@ export type ResponseDto = {
   visitorId: string
   metadata: Record<string, unknown>
   screenshotPath: string | null
+  resolved: boolean
+  autoResolved: boolean
+  resolvedAt: number | null
+  adminNote: string | null
   createdAt: number
+}
+
+export type ResponsePatchInput = {
+  resolved?: boolean
+  adminNote?: string | null
+}
+
+const ADMIN_NOTE_MAX = 4000
+
+/** Initial resolution flags when creating a response from a comment. */
+export function resolutionFromComment(comment: string | null | undefined, at: number) {
+  const hasComment = !!(comment && comment.trim())
+  if (hasComment) {
+    return { resolved: 0, autoResolved: 0, resolvedAt: null as number | null }
+  }
+  return { resolved: 1, autoResolved: 1, resolvedAt: at }
 }
 
 function parseMeta(value: string) {
@@ -74,8 +95,25 @@ function toResponseDto(row: typeof responses.$inferSelect): ResponseDto {
     visitorId: row.visitorId,
     metadata: parseMeta(row.metadata),
     screenshotPath: row.screenshotPath || null,
+    resolved: row.resolved === 1,
+    autoResolved: row.autoResolved === 1,
+    resolvedAt: row.resolvedAt ?? null,
+    adminNote: row.adminNote || null,
     createdAt: row.createdAt,
   }
+}
+
+function normalizeAdminNote(value: string | null | undefined): string | null {
+  if (value == null) return null
+  const trimmed = value.trim()
+  if (!trimmed) return null
+  if (trimmed.length > ADMIN_NOTE_MAX) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `adminNote max length is ${ADMIN_NOTE_MAX}`,
+    })
+  }
+  return trimmed
 }
 
 export function getResponse(projectId: string, responseId: string): ResponseDto {
@@ -115,6 +153,8 @@ export function listResponses(projectId: string, filters: ResponseFilters = {}) 
   if (filters.hasComment === false) {
     conditions.push(sql`(${responses.comment} is null or trim(${responses.comment}) = '')`)
   }
+  if (filters.resolved === true) conditions.push(eq(responses.resolved, 1))
+  if (filters.resolved === false) conditions.push(eq(responses.resolved, 0))
   if (filters.q) {
     conditions.push(sql`${responses.comment} like ${`%${filters.q}%`}`)
   }
@@ -144,6 +184,42 @@ export function listResponses(projectId: string, filters: ResponseFilters = {}) 
   }
 }
 
+export function updateResponse(
+  projectId: string,
+  responseId: string,
+  patch: ResponsePatchInput,
+): ResponseDto {
+  getResponse(projectId, responseId)
+
+  const updates: Partial<typeof responses.$inferInsert> = {}
+
+  if (patch.resolved !== undefined) {
+    if (patch.resolved) {
+      updates.resolved = 1
+      updates.resolvedAt = Date.now()
+    } else {
+      updates.resolved = 0
+      updates.resolvedAt = null
+    }
+  }
+
+  if (patch.adminNote !== undefined) {
+    updates.adminNote = normalizeAdminNote(patch.adminNote)
+  }
+
+  if (Object.keys(updates).length === 0) {
+    throw createError({ statusCode: 400, statusMessage: 'No fields to update' })
+  }
+
+  useDb()
+    .update(responses)
+    .set(updates)
+    .where(and(eq(responses.id, responseId), eq(responses.projectId, projectId)))
+    .run()
+
+  return getResponse(projectId, responseId)
+}
+
 export function deleteResponse(projectId: string, responseId: string) {
   const row = getResponse(projectId, responseId)
   deleteScreenshot(row.screenshotPath)
@@ -163,7 +239,8 @@ export function exportResponses(projectId: string, format: 'csv' | 'json', filte
 
   const headers = [
     'id', 'surveyId', 'score', 'comment', 'urlPath', 'urlHost',
-    'locale', 'device', 'visitorId', 'screenshotPath', 'createdAt',
+    'locale', 'device', 'visitorId', 'screenshotPath',
+    'resolved', 'autoResolved', 'resolvedAt', 'adminNote', 'createdAt',
   ]
   const escape = (value: unknown) => {
     const str = value == null ? '' : String(value)

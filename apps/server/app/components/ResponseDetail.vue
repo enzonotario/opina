@@ -10,6 +10,7 @@ const props = defineProps<{
 const emit = defineEmits<{
   close: []
   deleted: []
+  updated: []
 }>()
 
 type ResponseRow = {
@@ -23,6 +24,10 @@ type ResponseRow = {
   screenshotPath: string | null
   surveyId: string
   metadata?: Record<string, unknown>
+  resolved?: boolean
+  autoResolved?: boolean
+  resolvedAt?: number | null
+  adminNote?: string | null
 }
 
 type ResponseMeta = {
@@ -49,9 +54,19 @@ const surveys = ref<SurveyDto[]>([])
 const surveysFor = ref<string | null>(null)
 const loading = ref(false)
 const deleting = ref(false)
+const savingResolved = ref(false)
+const savingNote = ref(false)
+const adminNoteDraft = ref('')
 let request = 0
 
 const open = computed(() => !!props.projectId && !!props.responseId)
+
+const resolvedModel = computed({
+  get: () => detail.value?.resolved === true,
+  set: (value: boolean) => {
+    void setResolved(value)
+  },
+})
 
 const survey = computed(() => {
   const id = detail.value?.surveyId
@@ -81,9 +96,11 @@ watch(
         surveysFor.value = projectId
       }
       detail.value = row
+      adminNoteDraft.value = row.adminNote || ''
     } catch {
       if (token !== request) return
       detail.value = null
+      adminNoteDraft.value = ''
       toast.add({ title: 'Response not found', color: 'error' })
       emit('close')
     } finally {
@@ -168,6 +185,60 @@ function fmt(ts: number) {
   })
 }
 
+async function setResolved(resolved: boolean) {
+  const row = detail.value
+  const projectId = props.projectId
+  if (!row || !projectId || savingResolved.value) return
+  if (row.resolved === resolved) return
+
+  savingResolved.value = true
+  try {
+    const updated = await $fetch<ResponseRow>(
+      `/api/admin/projects/${projectId}/responses/${row.id}`,
+      { method: 'PATCH', body: { resolved } },
+    )
+    detail.value = { ...row, ...updated }
+    emit('updated')
+  } catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
+    toast.add({
+      title: err.data?.statusMessage || err.statusMessage || 'Update failed',
+      color: 'error',
+    })
+  } finally {
+    savingResolved.value = false
+  }
+}
+
+async function saveAdminNote() {
+  const row = detail.value
+  const projectId = props.projectId
+  if (!row || !projectId || savingNote.value) return
+
+  const next = adminNoteDraft.value.trim() || null
+  if ((row.adminNote || null) === next) return
+
+  savingNote.value = true
+  try {
+    const updated = await $fetch<ResponseRow>(
+      `/api/admin/projects/${projectId}/responses/${row.id}`,
+      { method: 'PATCH', body: { adminNote: next } },
+    )
+    detail.value = { ...row, ...updated }
+    adminNoteDraft.value = updated.adminNote || ''
+    toast.add({ title: 'Note saved', color: 'success' })
+    emit('updated')
+  } catch (e: unknown) {
+    const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
+    toast.add({
+      title: err.data?.statusMessage || err.statusMessage || 'Save failed',
+      color: 'error',
+    })
+  } finally {
+    savingNote.value = false
+  }
+}
+
 async function removeResponse() {
   const row = detail.value
   const projectId = props.projectId
@@ -244,6 +315,45 @@ async function removeResponse() {
             {{ detail.comment || '—' }}
           </p>
         </div>
+
+        <div class="space-y-3 rounded-lg border border-default px-3 py-2.5">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <USwitch
+              v-model="resolvedModel"
+              label="Resolved"
+              size="sm"
+              :disabled="savingResolved"
+            />
+            <UBadge
+              v-if="detail.autoResolved"
+              color="neutral"
+              variant="subtle"
+              size="sm"
+              label="Auto-resolved"
+            />
+          </div>
+          <UFormField label="Admin note">
+            <UTextarea
+              v-model="adminNoteDraft"
+              :rows="3"
+              autoresize
+              placeholder="Internal note…"
+              class="w-full"
+            />
+          </UFormField>
+          <div class="flex justify-end">
+            <UButton
+              size="xs"
+              color="neutral"
+              variant="soft"
+              label="Save note"
+              :loading="savingNote"
+              :disabled="savingNote || (adminNoteDraft.trim() || null) === (detail.adminNote || null)"
+              @click="saveAdminNote"
+            />
+          </div>
+        </div>
+
         <dl class="grid grid-cols-2 gap-3 text-sm">
           <div>
             <dt class="text-xs text-muted">

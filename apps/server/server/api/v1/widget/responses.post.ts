@@ -21,6 +21,7 @@ import { isVisitorDailyCapReached } from '../../../utils/visitor-limit'
 import { toSurveyDto } from '../../../utils/surveys'
 import { deliverResponseWebhooks } from '../../../utils/webhooks'
 import { responseAnswerLabel } from '../../../utils/webhook-payload'
+import { resolutionFromComment } from '../../../utils/responses'
 
 const MIN_SHOWN_MS = 1000
 const FAKE_OK = { ok: true as const }
@@ -105,6 +106,8 @@ export default defineEventHandler(async (event) => {
 
   const id = createId('rsp')
   const createdAt = Date.now()
+  const comment = body.comment || null
+  const resolution = resolutionFromComment(comment, createdAt)
   const urlPath = (body.path.split('?')[0] || '/').slice(0, 2048)
   const urlHost = hostFromOrigin(origin, body.host || '').slice(0, 255)
   useDb().insert(responses).values({
@@ -112,13 +115,16 @@ export default defineEventHandler(async (event) => {
     projectId: project.id,
     surveyId: survey.id,
     score: body.score ?? null,
-    comment: body.comment || null,
+    comment,
     urlPath,
     urlHost,
     locale: body.locale || null,
     device: body.device || null,
     visitorId: body.visitorId,
     metadata,
+    resolved: resolution.resolved,
+    autoResolved: resolution.autoResolved,
+    resolvedAt: resolution.resolvedAt,
     createdAt,
   }).run()
 

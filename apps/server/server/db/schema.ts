@@ -58,6 +58,10 @@ export const responses = sqliteTable(
     visitorId: text('visitor_id').notNull(),
     metadata: text('metadata').notNull().default('{}'),
     screenshotPath: text('screenshot_path'),
+    resolved: integer('resolved').notNull().default(0),
+    autoResolved: integer('auto_resolved').notNull().default(0),
+    resolvedAt: integer('resolved_at'),
+    adminNote: text('admin_note'),
     createdAt: integer('created_at').notNull(),
   },
   table => [
@@ -67,6 +71,11 @@ export const responses = sqliteTable(
     index('responses_survey_visitor_created_idx').on(
       table.surveyId,
       table.visitorId,
+      table.createdAt,
+    ),
+    index('responses_project_resolved_created_idx').on(
+      table.projectId,
+      table.resolved,
       table.createdAt,
     ),
   ],

@@ -421,6 +421,7 @@ function relativeTime(ms: number) {
         :response-id="detail?.responseId ?? null"
         @close="detail = null"
         @deleted="refreshStats()"
+        @updated="refreshStats()"
       />
     </template>
   </UDashboardPanel>

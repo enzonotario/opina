@@ -319,6 +319,7 @@ const detailResponseId = ref<string | null>(null)
         :response-id="detailResponseId"
         @close="detailResponseId = null"
         @deleted="refreshStats()"
+        @updated="refreshStats()"
       />
     </template>
   </UDashboardPanel>

@@ -37,6 +37,13 @@ const hasComment = ref<'all' | 'yes' | 'no'>(
       ? 'no'
       : 'all',
 )
+const resolvedFilter = ref<'all' | 'open' | 'resolved'>(
+  route.query.resolved === 'false' || route.query.resolved === 'open'
+    ? 'open'
+    : route.query.resolved === 'true' || route.query.resolved === 'resolved'
+      ? 'resolved'
+      : 'all',
+)
 const path = ref(typeof route.query.path === 'string' ? route.query.path : '')
 const surveyFilter = ref<string>(
   typeof route.query.surveyId === 'string' ? route.query.surveyId : 'all',
@@ -83,6 +90,8 @@ const query = computed(() => {
   if (path.value.trim()) params.set('path', path.value.trim())
   if (hasComment.value === 'yes') params.set('hasComment', 'true')
   if (hasComment.value === 'no') params.set('hasComment', 'false')
+  if (resolvedFilter.value === 'open') params.set('resolved', 'false')
+  if (resolvedFilter.value === 'resolved') params.set('resolved', 'true')
   if (surveyFilter.value !== 'all') params.set('surveyId', surveyFilter.value)
   if (scoreFilter.value.length) params.set('scores', scoreFilter.value.join(','))
   return params.toString()
@@ -92,7 +101,7 @@ const { data, status, refresh } = await useFetch(
   () => `/api/admin/projects/${id.value}/responses?${query.value}`,
 )
 
-watch([q, hasComment, path, surveyFilter, scoreFilter], () => {
+watch([q, hasComment, resolvedFilter, path, surveyFilter, scoreFilter], () => {
   page.value = 0
 })
 
@@ -120,6 +129,10 @@ type ResponseRow = {
   screenshotPath: string | null
   surveyId: string
   metadata?: Record<string, unknown>
+  resolved?: boolean
+  autoResolved?: boolean
+  resolvedAt?: number | null
+  adminNote?: string | null
 }
 
 const selected = ref<ResponseRow | null>(null)
@@ -168,6 +181,8 @@ function exportUrl(format: 'csv' | 'json') {
   if (path.value.trim()) params.set('path', path.value.trim())
   if (hasComment.value === 'yes') params.set('hasComment', 'true')
   if (hasComment.value === 'no') params.set('hasComment', 'false')
+  if (resolvedFilter.value === 'open') params.set('resolved', 'false')
+  if (resolvedFilter.value === 'resolved') params.set('resolved', 'true')
   if (surveyFilter.value !== 'all') params.set('surveyId', surveyFilter.value)
   if (scoreFilter.value.length) params.set('scores', scoreFilter.value.join(','))
   return `/api/admin/projects/${id.value}/export?${params}`
@@ -462,6 +477,16 @@ watch(scoreFilterItems, (items) => {
                 { label: 'Without comment', value: 'no' },
               ]"
             />
+            <USelect
+              v-model="resolvedFilter"
+              size="sm"
+              class="w-32"
+              :items="[
+                { label: 'All', value: 'all' },
+                { label: 'Open', value: 'open' },
+                { label: 'Resolved', value: 'resolved' },
+              ]"
+            />
             <USelectMenu
               v-model="scoreFilterModel"
               :items="scoreFilterItems"
@@ -550,6 +575,9 @@ watch(scoreFilterItems, (items) => {
             <table class="min-w-full text-sm">
               <thead class="sticky top-0 z-10 bg-elevated text-left text-xs text-muted border-b border-default">
                 <tr>
+                  <th class="px-3 py-2.5 font-medium w-10">
+                    <span class="sr-only">Status</span>
+                  </th>
                   <th class="px-3 py-2.5 font-medium w-28">
                     Screenshot
                   </th>
@@ -584,6 +612,14 @@ watch(scoreFilterItems, (items) => {
                   :class="{ 'bg-elevated/50': selected?.id === row.id }"
                   @click="selected = row"
                 >
+                  <td class="px-3 py-2">
+                    <UIcon
+                      :name="row.resolved ? 'i-lucide-circle-check' : 'i-lucide-circle'"
+                      class="size-4"
+                      :class="row.resolved ? 'text-success' : 'text-muted'"
+                      :title="row.resolved ? (row.autoResolved ? 'Auto-resolved' : 'Resolved') : 'Open'"
+                    />
+                  </td>
                   <td class="px-3 py-2">
                     <img
                       v-if="row.screenshotPath"
@@ -691,6 +727,7 @@ watch(scoreFilterItems, (items) => {
         :response-id="selected?.id ?? null"
         @close="closeSelected"
         @deleted="refresh()"
+        @updated="refresh()"
       />
     </template>
   </UDashboardPanel>

@@ -13,6 +13,7 @@ import { importJobs, responses } from '../db/schema'
 import { getSqlite, useDb } from '../db/client'
 import { createId } from './ids'
 import { getProjectOrThrow } from './projects'
+import { resolutionFromComment } from './responses'
 import { getSurveyOrThrow } from './surveys'
 
 const MAX_ROWS = 5000
@@ -307,6 +308,7 @@ export async function processImportJob(jobId: string) {
             if (hotjarNumber) metadata.hotjarNumber = hotjarNumber
             if (responseUrl) metadata.hotjarResponseUrl = responseUrl
 
+            const resolution = resolutionFromComment(comment, createdAt)
             db.insert(responses).values({
               id: createId('rsp'),
               projectId: job.projectId,
@@ -320,6 +322,9 @@ export async function processImportJob(jobId: string) {
               visitorId,
               metadata: JSON.stringify(metadata),
               screenshotPath: null,
+              resolved: resolution.resolved,
+              autoResolved: resolution.autoResolved,
+              resolvedAt: resolution.resolvedAt,
               createdAt,
             }).run()
 

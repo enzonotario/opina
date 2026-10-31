@@ -16,6 +16,7 @@ export default defineEventHandler(async (event) => {
     scores: parseScoreList(q.scores),
     path: q.path ? String(q.path) : undefined,
     hasComment: q.hasComment === 'true' ? true : q.hasComment === 'false' ? false : undefined,
+    resolved: q.resolved === 'true' ? true : q.resolved === 'false' ? false : undefined,
     q: q.q ? String(q.q) : undefined,
     limit: q.limit != null ? Number(q.limit) : undefined,
     offset: q.offset != null ? Number(q.offset) : undefined,
