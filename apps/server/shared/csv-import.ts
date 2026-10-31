@@ -56,12 +56,10 @@ function parseCsvRows(text: string): string[][] {
         if (text[i + 1] === '"') {
           cell += '"'
           i++
-        }
-        else {
+        } else {
           inQuotes = false
         }
-      }
-      else {
+      } else {
         cell += ch
       }
       continue
@@ -175,8 +173,7 @@ export function splitUrl(value: string): { host: string, path: string } {
       host: u.host.slice(0, 255),
       path: (u.pathname || '/').slice(0, 2048) || '/',
     }
-  }
-  catch {
+  } catch {
     if (raw.startsWith('/')) return { host: '', path: raw.split('?')[0]!.slice(0, 2048) }
     return { host: '', path: '/' }
   }

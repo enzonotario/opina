@@ -39,4 +39,3 @@ export default defineEventHandler(async (event) => {
   const job = enqueueImportJob(id, { csv, surveyId, mapping })
   return { job }
 })
-

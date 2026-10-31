@@ -103,8 +103,7 @@ export function listResponses(projectId: string, filters: ResponseFilters = {}) 
   if (filters.to != null) conditions.push(lte(responses.createdAt, filters.to))
   if (filters.scores?.length) {
     conditions.push(inArray(responses.score, filters.scores))
-  }
-  else {
+  } else {
     if (filters.scoreMin != null) conditions.push(gte(responses.score, filters.scoreMin))
     if (filters.scoreMax != null) conditions.push(lte(responses.score, filters.scoreMax))
   }

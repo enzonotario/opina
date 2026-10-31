@@ -387,7 +387,6 @@ const tabLinks = computed(() => [[{
 
         <div class="grid gap-8 xl:grid-cols-[minmax(0,26rem)_minmax(0,1fr)] xl:items-start">
           <div class="space-y-5 min-w-0">
-
             <template v-if="tab === 'questions'">
               <UFormField
                 label="Active"

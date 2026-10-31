@@ -262,124 +262,124 @@ function relativeTime(ms: number) {
         </section>
 
         <section class="rounded-xl ring-1 ring-default bg-default p-5 space-y-4">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div class="min-w-0">
-                <h2 class="text-sm font-semibold text-highlighted">
-                  Responses per day
-                </h2>
-                <p class="text-xs text-muted mt-0.5">
-                  {{ chartGroup === 'projects' && (stats.dailyByProject?.length || 0) > 1
-                    ? 'Grouped by project · 30 days'
-                    : 'All projects · 30 days' }}
-                </p>
-              </div>
-              <UTabs
-                v-if="chartGroupReady && (stats.dailyByProject?.length || 0) > 1"
-                v-model="chartGroup"
-                :default-value="chartGroup"
-                :items="chartGroupItems"
-                :content="false"
-                size="xs"
-                color="neutral"
-                variant="link"
-                class="w-auto shrink-0"
-                :ui="{ root: 'w-auto', list: 'w-auto' }"
-              />
-            </div>
-            <DailyChart
-              :daily="stats.daily"
-              :series="chartSeries"
-            />
-            <div class="flex flex-wrap gap-1.5 pt-1">
-              <span
-                v-for="bucket in stats.distribution"
-                :key="bucket.score"
-                class="inline-flex items-center gap-1 text-xs rounded-full bg-elevated px-2.5 py-1"
-              >
-                <span>{{ EMOJIS[bucket.score - 1] }}</span>
-                <span class="tabular-nums text-muted">{{ bucket.count }}</span>
-              </span>
-            </div>
-          </section>
-
-          <section class="rounded-xl ring-1 ring-default bg-default overflow-hidden">
-            <div class="flex items-center justify-between px-5 pt-5 pb-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="min-w-0">
               <h2 class="text-sm font-semibold text-highlighted">
-                Live responses
+                Responses per day
               </h2>
-              <span class="text-xs text-muted">Latest 20 · 30 days</span>
+              <p class="text-xs text-muted mt-0.5">
+                {{ chartGroup === 'projects' && (stats.dailyByProject?.length || 0) > 1
+                  ? 'Grouped by project · 30 days'
+                  : 'All projects · 30 days' }}
+              </p>
             </div>
-            <div
-              v-if="stats.recentResponses.length"
-              class="overflow-x-auto"
+            <UTabs
+              v-if="chartGroupReady && (stats.dailyByProject?.length || 0) > 1"
+              v-model="chartGroup"
+              :default-value="chartGroup"
+              :items="chartGroupItems"
+              :content="false"
+              size="xs"
+              color="neutral"
+              variant="link"
+              class="w-auto shrink-0"
+              :ui="{ root: 'w-auto', list: 'w-auto' }"
+            />
+          </div>
+          <DailyChart
+            :daily="stats.daily"
+            :series="chartSeries"
+          />
+          <div class="flex flex-wrap gap-1.5 pt-1">
+            <span
+              v-for="bucket in stats.distribution"
+              :key="bucket.score"
+              class="inline-flex items-center gap-1 text-xs rounded-full bg-elevated px-2.5 py-1"
             >
-              <table class="w-full text-sm">
-                <thead>
-                  <tr class="text-left text-xs text-muted border-y border-default">
-                    <th class="font-medium px-5 py-2 w-[22%]">
-                      Site
-                    </th>
-                    <th class="font-medium px-3 py-2 w-[18%]">
-                      Page
-                    </th>
-                    <th class="font-medium px-3 py-2">
-                      Comment
-                    </th>
-                    <th class="font-medium px-3 py-2 w-[8rem]">
-                      Reaction
-                    </th>
-                    <th class="font-medium pl-3 pr-5 py-2 w-[6rem] text-right">
-                      When
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="item in stats.recentResponses"
-                    :key="item.id"
-                    class="border-b border-default last:border-0 hover:bg-elevated/60 cursor-pointer"
-                    @click="openResponse(item.projectId, item.id)"
-                  >
-                    <td class="px-5 py-3">
-                      <span class="flex items-center gap-2 min-w-0">
-                        <ProjectMark
-                          :name="item.projectName"
-                          :logo-url="item.logoUrl"
-                          class="size-6"
-                        />
-                        <span class="truncate font-medium text-highlighted">{{ item.projectName }}</span>
-                      </span>
-                    </td>
-                    <td class="px-3 py-3 font-mono text-xs text-muted">
-                      <span class="block truncate">{{ item.urlPath }}</span>
-                    </td>
-                    <td class="px-3 py-3">
-                      <span
-                        v-if="item.comment"
-                        class="line-clamp-2 text-highlighted"
-                      >{{ item.comment }}</span>
-                      <span
-                        v-else
-                        class="text-muted"
-                      >—</span>
-                    </td>
-                    <td class="px-3 py-3 whitespace-nowrap">
-                      {{ reaction(item.score, item.surveyType) }}
-                    </td>
-                    <td class="pl-3 pr-5 py-3 text-right text-xs text-muted whitespace-nowrap">
-                      {{ relativeTime(item.createdAt) }}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-            <p
-              v-else
-              class="text-sm text-muted py-6 text-center"
-            >
-              No responses yet across projects.
-            </p>
-          </section>
+              <span>{{ EMOJIS[bucket.score - 1] }}</span>
+              <span class="tabular-nums text-muted">{{ bucket.count }}</span>
+            </span>
+          </div>
+        </section>
+
+        <section class="rounded-xl ring-1 ring-default bg-default overflow-hidden">
+          <div class="flex items-center justify-between px-5 pt-5 pb-3">
+            <h2 class="text-sm font-semibold text-highlighted">
+              Live responses
+            </h2>
+            <span class="text-xs text-muted">Latest 20 · 30 days</span>
+          </div>
+          <div
+            v-if="stats.recentResponses.length"
+            class="overflow-x-auto"
+          >
+            <table class="w-full text-sm">
+              <thead>
+                <tr class="text-left text-xs text-muted border-y border-default">
+                  <th class="font-medium px-5 py-2 w-[22%]">
+                    Site
+                  </th>
+                  <th class="font-medium px-3 py-2 w-[18%]">
+                    Page
+                  </th>
+                  <th class="font-medium px-3 py-2">
+                    Comment
+                  </th>
+                  <th class="font-medium px-3 py-2 w-[8rem]">
+                    Reaction
+                  </th>
+                  <th class="font-medium pl-3 pr-5 py-2 w-[6rem] text-right">
+                    When
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="item in stats.recentResponses"
+                  :key="item.id"
+                  class="border-b border-default last:border-0 hover:bg-elevated/60 cursor-pointer"
+                  @click="openResponse(item.projectId, item.id)"
+                >
+                  <td class="px-5 py-3">
+                    <span class="flex items-center gap-2 min-w-0">
+                      <ProjectMark
+                        :name="item.projectName"
+                        :logo-url="item.logoUrl"
+                        class="size-6"
+                      />
+                      <span class="truncate font-medium text-highlighted">{{ item.projectName }}</span>
+                    </span>
+                  </td>
+                  <td class="px-3 py-3 font-mono text-xs text-muted">
+                    <span class="block truncate">{{ item.urlPath }}</span>
+                  </td>
+                  <td class="px-3 py-3">
+                    <span
+                      v-if="item.comment"
+                      class="line-clamp-2 text-highlighted"
+                    >{{ item.comment }}</span>
+                    <span
+                      v-else
+                      class="text-muted"
+                    >—</span>
+                  </td>
+                  <td class="px-3 py-3 whitespace-nowrap">
+                    {{ reaction(item.score, item.surveyType) }}
+                  </td>
+                  <td class="pl-3 pr-5 py-3 text-right text-xs text-muted whitespace-nowrap">
+                    {{ relativeTime(item.createdAt) }}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p
+            v-else
+            class="text-sm text-muted py-6 text-center"
+          >
+            No responses yet across projects.
+          </p>
+        </section>
 
         <section class="rounded-xl ring-1 ring-default bg-default p-5 space-y-3">
           <h2 class="text-sm font-semibold text-highlighted">

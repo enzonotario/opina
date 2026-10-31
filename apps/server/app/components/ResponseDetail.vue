@@ -81,14 +81,12 @@ watch(
         surveysFor.value = projectId
       }
       detail.value = row
-    }
-    catch {
+    } catch {
       if (token !== request) return
       detail.value = null
       toast.add({ title: 'Response not found', color: 'error' })
       emit('close')
-    }
-    finally {
+    } finally {
       if (token === request) loading.value = false
     }
   },
@@ -185,15 +183,13 @@ async function removeResponse() {
     toast.add({ title: 'Response deleted', color: 'success' })
     emit('deleted')
     emit('close')
-  }
-  catch (e: unknown) {
+  } catch (e: unknown) {
     const err = e as { data?: { statusMessage?: string }, statusMessage?: string }
     toast.add({
       title: err.data?.statusMessage || err.statusMessage || 'Delete failed',
       color: 'error',
     })
-  }
-  finally {
+  } finally {
     deleting.value = false
   }
 }

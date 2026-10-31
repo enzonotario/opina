@@ -75,7 +75,7 @@ async function readHtml(url: URL) {
     redirect: 'follow',
     signal: AbortSignal.timeout(5000),
     headers: {
-      accept: 'text/html,application/xhtml+xml',
+      'accept': 'text/html,application/xhtml+xml',
       'user-agent': 'OpinaFavicon/1.0',
     },
   })

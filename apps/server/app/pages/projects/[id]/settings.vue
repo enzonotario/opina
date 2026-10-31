@@ -444,7 +444,11 @@ async function copyKey() {
             class="rounded-lg border border-default bg-elevated/50 p-4 space-y-3"
             @submit.prevent="addWebhook"
           >
-            <UFormField label="Name" name="hook-name" required>
+            <UFormField
+              label="Name"
+              name="hook-name"
+              required
+            >
               <UInput
                 v-model="hookName"
                 class="w-full"
@@ -452,7 +456,11 @@ async function copyKey() {
                 required
               />
             </UFormField>
-            <UFormField label="URL" name="hook-url" required>
+            <UFormField
+              label="URL"
+              name="hook-url"
+              required
+            >
               <UInput
                 v-model="hookUrl"
                 class="w-full"

@@ -8,15 +8,13 @@ export function isOriginAllowed(origin: string | null, allowed: string[]) {
     const got = new URL(origin)
     // Local embeds (Nuxt/Vite on any port) during development.
     if (isLocalHostname(got.hostname)) return true
-  }
-  catch {
+  } catch {
     /* fall through */
   }
   return allowed.some((entry) => {
     try {
       return new URL(entry).origin === new URL(origin).origin
-    }
-    catch {
+    } catch {
       return entry === origin
     }
   })

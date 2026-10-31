@@ -123,4 +123,3 @@ export const importJobs = sqliteTable(
     index('import_jobs_project_created_idx').on(table.projectId, table.createdAt),
   ],
 )
-

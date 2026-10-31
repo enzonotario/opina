@@ -169,15 +169,13 @@ async function runImport(close: () => void) {
       description: `Processing ${created.total} rows in the background`,
       color: 'success',
     })
-  }
-  catch (e: unknown) {
+  } catch (e: unknown) {
     const err = e as { data?: { statusMessage?: string }, statusMessage?: string, message?: string }
     toast.add({
       title: err.data?.statusMessage || err.statusMessage || err.message || 'Import failed',
       color: 'error',
     })
-  }
-  finally {
+  } finally {
     pending.value = false
   }
 }

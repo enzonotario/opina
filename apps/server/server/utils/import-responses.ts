@@ -39,8 +39,7 @@ function resolveDataDir() {
   try {
     const config = useRuntimeConfig()
     return String(config.opinaDataDir || process.env.OPINA_DATA_DIR || './data')
-  }
-  catch {
+  } catch {
     return process.env.OPINA_DATA_DIR || './data'
   }
 }
@@ -68,8 +67,7 @@ function toJobDto(row: typeof importJobs.$inferSelect): ImportJobDto {
   try {
     const parsed = JSON.parse(row.errors || '[]')
     if (Array.isArray(parsed)) errors = parsed
-  }
-  catch {
+  } catch {
     /* ignore */
   }
   return {
@@ -125,8 +123,7 @@ function existingImportKeys(projectId: string) {
     try {
       const meta = JSON.parse(row.metadata || '{}') as Record<string, unknown>
       if (typeof meta.importKey === 'string' && meta.importKey) keys.add(meta.importKey)
-    }
-    catch {
+    } catch {
       /* ignore */
     }
   }
@@ -137,8 +134,7 @@ function cleanupFiles(jobId: string) {
   for (const path of [csvPath(jobId), mappingPath(jobId)]) {
     try {
       unlinkSync(path)
-    }
-    catch {
+    } catch {
       /* ignore */
     }
   }
@@ -329,8 +325,7 @@ export async function processImportJob(jobId: string) {
 
             seen.add(importKey)
             imported++
-          }
-          catch (e) {
+          } catch (e) {
             if (errors.length < 50) {
               errors.push({
                 row: rowNum,
@@ -355,15 +350,13 @@ export async function processImportJob(jobId: string) {
       detected,
     })
     cleanupFiles(jobId)
-  }
-  catch (e) {
+  } catch (e) {
     patchJob(jobId, {
       status: 'error',
       errorMessage: e instanceof Error ? e.message : 'Import failed',
     })
     cleanupFiles(jobId)
-  }
-  finally {
+  } finally {
     running.delete(jobId)
   }
 }

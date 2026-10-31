@@ -87,8 +87,7 @@ export function geoFromRequest(event: H3Event): {
   if (cityRaw) {
     try {
       city = asShortString(decodeURIComponent(cityRaw), 64)
-    }
-    catch {
+    } catch {
       city = asShortString(cityRaw, 64)
     }
   }

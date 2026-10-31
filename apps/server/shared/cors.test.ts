@@ -24,5 +24,3 @@ describe('isOriginAllowed', () => {
     expect(isOriginAllowed('https://evil.com', ['https://comparadolar.ar'])).toBe(false)
   })
 })
-
-

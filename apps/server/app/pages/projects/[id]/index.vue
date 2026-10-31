@@ -266,7 +266,7 @@ const detailResponseId = ref<string | null>(null)
                       </p>
                     </div>
                   </div>
-                  <p class="text-sm text-highlighted line-clamp-2 group-hover:underline decoration-muted/60 underline-offset-2">
+                  <p class="text-sm text-highlighted line-clamp-2 group-hover:underline underline-offset-2">
                     {{ item.comment }}
                   </p>
                 </button>

@@ -134,8 +134,7 @@ async function openResponseById(responseId: string) {
     selected.value = await $fetch<ResponseRow>(
       `/api/admin/projects/${id.value}/responses/${responseId}`,
     )
-  }
-  catch {
+  } catch {
     toast.add({ title: 'Response not found', color: 'error' })
     clearResponseQuery()
   }
@@ -230,16 +229,14 @@ async function pollImportJob(jobId: string) {
           importJob.value = null
         }
       }, 4000)
-    }
-    else if (res.job.status === 'error') {
+    } else if (res.job.status === 'error') {
       stopImportPoll()
       toast.add({
         title: res.job.errorMessage || 'Import failed',
         color: 'error',
       })
     }
-  }
-  catch {
+  } catch {
     /* keep polling */
   }
 }
@@ -255,7 +252,6 @@ function onImportStarted(job: ImportJob) {
 }
 
 onBeforeUnmount(() => stopImportPoll())
-
 
 async function removeResponse(row: { id: string, comment: string | null }) {
   const preview = row.comment?.trim()
@@ -696,8 +692,6 @@ watch(scoreFilterItems, (items) => {
         @close="closeSelected"
         @deleted="refresh()"
       />
-
     </template>
   </UDashboardPanel>
 </template>
-

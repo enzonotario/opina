@@ -71,7 +71,6 @@ onBeforeUnmount(() => {
   resizeObserver = null
 })
 
-
 function pickLabel(map: Record<string, string> | undefined, fallback: string) {
   if (!map) return fallback
   const locale = props.appearance.locale || 'es'

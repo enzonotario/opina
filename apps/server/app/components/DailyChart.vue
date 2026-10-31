@@ -48,7 +48,7 @@ const rows = computed<Row[]>(() => {
     }))
   }
   return (props.series || []).flatMap(series =>
-    points.value.map(point => {
+    points.value.map((point) => {
       const match = series.daily.find(p => p.day === point.day)
       return {
         day: point.day,

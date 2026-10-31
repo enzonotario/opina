@@ -99,14 +99,14 @@ export function deleteWebhook(projectId: string, webhookId: string) {
 
 async function deliverOne(row: WebhookRow, input: ResponseWebhookInput) {
   const body = responseCreatedBody(row.id, input)
-  let status: number | null = null
-  let error: string | null = null
+  let status: number | null
+  let error: string | null
   try {
     const response = await $fetch.raw(row.url, {
       method: 'POST',
       headers: {
         'content-type': 'application/json',
-        authorization: `Bearer ${row.secret}`,
+        'authorization': `Bearer ${row.secret}`,
         'x-opina-event': 'response.created',
         'x-opina-signature': signWebhookBody(row.secret, body),
       },
@@ -114,7 +114,7 @@ async function deliverOne(row: WebhookRow, input: ResponseWebhookInput) {
       timeout: 4000,
     })
     status = response.status
-    if (status < 200 || status >= 300) error = `HTTP ${status}`
+    error = (status < 200 || status >= 300) ? `HTTP ${status}` : null
   } catch (err: unknown) {
     const http = err && typeof err === 'object' && 'statusCode' in err
       ? Number((err as { statusCode?: number }).statusCode)
