@@ -39,6 +39,13 @@ const mcpUrl = computed(() =>
   `${String(config.public.url || 'http://localhost:3000').replace(/\/$/, '')}/mcp`,
 )
 
+const mcpSnippet = computed(() => [
+  'Authorization: Bearer opina_pat_…',
+  '# Cursor / Claude MCP server URL:',
+  mcpUrl.value,
+].join('\n'))
+
+
 async function runNow() {
   pending.value = true
   try {
@@ -253,9 +260,7 @@ function bytes(n: number | null) {
             No tokens yet.
           </p>
 
-          <pre class="rounded-lg bg-muted p-3 text-[11px] font-mono overflow-x-auto text-highlighted">Authorization: Bearer opina_pat_…
-# Cursor / Claude MCP server URL:
-{{ mcpUrl }}</pre>
+          <pre class="rounded-lg bg-muted p-3 text-[11px] font-mono overflow-x-auto text-highlighted">{{ mcpSnippet }}</pre>
         </section>
 
         <section class="rounded-lg border border-default p-4 bg-default space-y-3">
