@@ -108,7 +108,8 @@ export function createProject(input: {
       devices: ['desktop', 'tablet', 'mobile'],
       sampleRate: 100,
     }),
-    frequency: JSON.stringify({ mode: 'once' }),
+    // Host apps call Opina.prompt() after their own visit gates; 30d between prompts.
+    frequency: JSON.stringify({ mode: 'cooldown', days: 30 }),
     isActive: 1,
     createdAt: now,
     updatedAt: now,

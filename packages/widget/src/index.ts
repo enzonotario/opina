@@ -48,7 +48,13 @@ type ShowOptions = {
 }
 
 type OpinaApi = {
+  /** Force-open (footer / data-opina). Skips frequency gates. */
   show: (surveyId?: string, opts?: ShowOptions) => void
+  /**
+   * Soft-open for host-driven prompts. Respects frequency, path and device.
+   * Use after your own visit/cooldown gates.
+   */
+  prompt: (surveyId?: string, opts?: Omit<ShowOptions, 'force'>) => void
   hide: () => void
   setMeta: (meta: Record<string, unknown>) => void
   setLocale: (locale: string) => void
@@ -895,6 +901,9 @@ function armTriggers() {
 const api: OpinaApi = {
   show(surveyId, opts) {
     show(surveyId, { ...opts, force: true, expanded: true })
+  },
+  prompt(surveyId, opts) {
+    show(surveyId, { expanded: false, ...opts, force: false })
   },
   hide,
   setMeta(meta) { state.meta = { ...state.meta, ...meta } },
