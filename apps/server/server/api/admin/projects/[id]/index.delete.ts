@@ -1,7 +1,4 @@
-import { eq } from 'drizzle-orm'
-import { projects } from '../../../../db/schema'
-import { useDb } from '../../../../db/client'
-import { getProjectOrThrow } from '../../../../utils/projects'
+import { deleteProject } from '../../../../utils/projects'
 import { requireAdminSession } from '../../../../utils/auth'
 
 export default defineEventHandler(async (event) => {
@@ -11,8 +8,7 @@ export default defineEventHandler(async (event) => {
     throw createError({ statusCode: 400, statusMessage: 'Missing project id' })
   }
 
-  getProjectOrThrow(id)
-  useDb().delete(projects).where(eq(projects.id, id)).run()
+  const result = deleteProject(id)
   console.info(`[opina] project deleted id=${id}`)
-  return { ok: true }
+  return result
 })

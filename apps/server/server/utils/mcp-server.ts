@@ -3,7 +3,7 @@ import * as v from 'valibot'
 import * as z from 'zod/v4'
 import { ProjectCreateSchema } from '../../shared/projects'
 import { SurveyUpdateSchema } from '../../shared/surveys'
-import { createProject, listProjects } from './projects'
+import { createProject, deleteProject, listProjects } from './projects'
 import {
   getResponse,
   listResponses,
@@ -90,6 +90,27 @@ export function createOpinaMcpServer() {
       } catch (e) {
         const err = e as { statusMessage?: string, message?: string }
         return toolError(err.statusMessage || err.message || 'create_project failed')
+      }
+    },
+  )
+
+  server.registerTool(
+    'delete_project',
+    {
+      title: 'Delete project',
+      description:
+        'Permanently delete a project and cascaded surveys/responses/webhooks.',
+      inputSchema: {
+        projectId: z.string().describe('Project id (prj_…)'),
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true },
+    },
+    async ({ projectId }) => {
+      try {
+        return jsonText(deleteProject(projectId))
+      } catch (e) {
+        const err = e as { statusMessage?: string, message?: string }
+        return toolError(err.statusMessage || err.message || 'delete_project failed')
       }
     },
   )

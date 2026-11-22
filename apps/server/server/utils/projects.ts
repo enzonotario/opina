@@ -126,3 +126,10 @@ export function listProjects() {
     .map(toProjectDto)
     .sort((a, b) => b.createdAt - a.createdAt)
 }
+
+/** Cascade deletes surveys/responses/webhooks via FK onDelete. */
+export function deleteProject(id: string) {
+  getProjectOrThrow(id)
+  useDb().delete(projects).where(eq(projects.id, id)).run()
+  return { ok: true as const, id }
+}
